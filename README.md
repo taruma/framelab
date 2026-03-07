@@ -13,6 +13,12 @@ The app streams responses live and can display model reasoning/thinking output (
 
 - Minimal dependencies: only `streamlit` and `openai`
 - OpenAI-compatible endpoint support via configurable **Base URL**
+- Hybrid configuration fallback:
+  - Sidebar input (if provided)
+  - Otherwise defaults from `config.py`
+- API key support from `.env` with sidebar override priority
+- Externalized default system prompt via `system_prompt.txt`
+- Uploaded image previews for both Phase 1 and Phase 2
 - Real-time streaming output in UI
 - Thought/reasoning stream shown in **Thought Process** expander
 - Two-phase workflow:
@@ -40,6 +46,18 @@ uv sync
 uv run run.py
 ```
 
+Create `.env` (optional but recommended):
+
+```bash
+copy .env.example .env
+```
+
+Then set your API key:
+
+```env
+OPENAI_API_KEY=your_real_key
+```
+
 ### B) From scratch (new folder)
 
 ```bash
@@ -59,15 +77,21 @@ uv run run.py
 
 ### 1) Configure model (sidebar)
 
-- **API Key**: your provider key
-- **Base URL / Endpoint**: defaults to `https://api.openai.com/v1`
+- **API Key**:
+  - Sidebar input has highest priority
+  - If left empty, app uses `OPENAI_API_KEY` from `.env`
+- **Base URL / Endpoint**:
+  - If sidebar is left empty, app uses `DEFAULT_BASE_URL` from `config.py`
   - You can override for OpenAI-compatible providers (local, OpenRouter, Groq, etc.)
-- **Model Name**: e.g. `gpt-4o`
-- **System Prompt**: optional instruction block for style/format/constraints
+- **Model Name**:
+  - If sidebar is left empty, app uses `DEFAULT_MODEL` from `config.py`
+- **System Prompt Override (optional)**:
+  - If empty, app uses default prompt content from `system_prompt.txt`
 
 ### 2) Phase 1 — Initial Analysis
 
 - Upload **Original Reference Image**
+- Uploaded image is shown as a preview
 - Add **Additional Context** (optional)
 - Click **Analyze**
 
@@ -80,6 +104,7 @@ Right panel shows:
 Appears only after Phase 1 completes.
 
 - Upload **generated/incorrect image**
+- Uploaded correction image is shown as a preview
 - Add **Correction Notes** (what is wrong)
 - Click **Submit Correction**
 
@@ -128,7 +153,8 @@ This conversation is persisted in `st.session_state`:
 
 ## Security Notes
 
-- API keys are entered through Streamlit UI and used in-session.
+- API keys can be loaded from `.env` (`OPENAI_API_KEY`) or entered in the sidebar.
+- Sidebar API key input overrides `.env` when both are present.
 - Avoid sharing screenshots/logs containing secrets.
 - For production deployment, use secret management (env vars / platform secret store).
 
@@ -137,8 +163,12 @@ This conversation is persisted in `st.session_state`:
 ## Project Files
 
 - `run.py` — complete application (single-file architecture)
+- `config.py` — default endpoint/model configuration
+- `system_prompt.txt` — default system prompt content
+- `.env.example` — sample env variable template
 - `pyproject.toml` — minimal dependencies
 - `AGENT.md` — contributor/iteration guide for future changes
+
 
 
 

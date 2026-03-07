@@ -1,10 +1,44 @@
 import base64
 import mimetypes
+import os
 import sys
 from typing import Any, Tuple
 
 import streamlit as st
 from openai import OpenAI
+
+from config import DEFAULT_BASE_URL, DEFAULT_MODEL
+
+
+def load_env_file(path: str = ".env") -> None:
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if line.startswith("export "):
+                    line = line[len("export ") :].strip()
+                if "=" not in line:
+                    continue
+
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip().strip('"').strip("'")
+                if key and key not in os.environ:
+                    os.environ[key] = value
+    except FileNotFoundError:
+        pass
+
+
+def load_system_prompt(path: str = "system_prompt.txt") -> Tuple[str, str]:
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read().strip(), ""
+    except FileNotFoundError:
+        return "", f"System prompt file not found: {path}"
+    except OSError as exc:
+        return "", f"Failed to read system prompt file ({path}): {exc}"
 
 
 def init_state() -> None:
@@ -111,20 +145,61 @@ def stream_response(
 def render() -> None:
     st.set_page_config(page_title="Multimodal Analysis + Correction", layout="wide")
     init_state()
+    load_env_file()
+
+    file_prompt, prompt_error = load_system_prompt()
 
     st.title("🧠 Multimodal Image Analysis")
     st.caption("Analyze a reference image, then iterate with correction images and notes.")
 
     with st.sidebar:
         st.header("Model Settings")
-        api_key = st.text_input("API Key", type="password")
-        base_url = st.text_input("Base URL / Endpoint", value="https://api.openai.com/v1")
-        model = st.text_input("Model Name", value="gpt-4o")
-        system_prompt = st.text_area(
-            "System Prompt",
+        api_key_input = st.text_input("API Key", type="password")
+        env_api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+        effective_api_key = api_key_input.strip() or env_api_key
+        if api_key_input.strip():
+            st.caption("Using API key from sidebar input.")
+        elif env_api_key:
+            st.caption("Using API key from .env (`OPENAI_API_KEY`).")
+        else:
+            st.caption("No API key found yet. Enter one in sidebar or set `OPENAI_API_KEY` in .env.")
+
+        base_url_input = st.text_input(
+            "Base URL / Endpoint",
             value="",
-            placeholder="Optional: define role, output format, constraints, and style.",
+            placeholder=f"Leave empty to use default: {DEFAULT_BASE_URL}",
+        )
+        model_input = st.text_input(
+            "Model Name",
+            value="",
+            placeholder=f"Leave empty to use default: {DEFAULT_MODEL}",
+        )
+
+        effective_base_url = base_url_input.strip() or DEFAULT_BASE_URL
+        effective_model = model_input.strip() or DEFAULT_MODEL
+
+        st.caption(
+            f"Endpoint in use: {'Sidebar override' if base_url_input.strip() else 'config.py default'}"
+        )
+        st.caption(
+            f"Model in use: {'Sidebar override' if model_input.strip() else 'config.py default'}"
+        )
+
+        system_prompt_override = st.text_area(
+            "System Prompt Override (optional)",
+            value="",
+            placeholder="Leave empty to use system_prompt.txt",
             height=180,
+        )
+        effective_system_prompt = system_prompt_override.strip() or file_prompt
+
+        if prompt_error:
+            st.warning(prompt_error)
+        else:
+            st.caption("Loaded default system prompt from `system_prompt.txt`.")
+
+        st.caption(
+            f"System prompt in use: {'Sidebar override' if system_prompt_override.strip() else 'system_prompt.txt'}"
         )
 
     left_col, right_col = st.columns([1, 1.2], gap="large")
@@ -136,6 +211,8 @@ def render() -> None:
             type=["png", "jpg", "jpeg", "webp"],
             key="original_image",
         )
+        if original_image is not None:
+            st.image(original_image, caption="Original image preview", use_container_width=True)
         additional_context = st.text_area("Additional Context", key="additional_context", height=140)
         analyze_clicked = st.button("Analyze", type="primary", use_container_width=True)
 
@@ -151,20 +228,20 @@ def render() -> None:
             phase1_answer_placeholder.markdown(st.session_state["phase1_output"])
 
     if analyze_clicked:
-        if not api_key.strip():
-            st.error("Please provide an API key.")
+        if not effective_api_key:
+            st.error("Please provide an API key in the sidebar or set OPENAI_API_KEY in .env.")
             return
-        if not model.strip():
+        if not effective_model:
             st.error("Please provide a model name.")
             return
         if original_image is None:
             st.error("Please upload an original reference image.")
             return
 
-        client = OpenAI(api_key=api_key.strip(), base_url=base_url.strip())
+        client = OpenAI(api_key=effective_api_key, base_url=effective_base_url)
         messages = []
-        if system_prompt.strip():
-            messages.append({"role": "system", "content": system_prompt.strip()})
+        if effective_system_prompt.strip():
+            messages.append({"role": "system", "content": effective_system_prompt.strip()})
 
         initial_user_text = (
             "Analyze this reference image in highly detailed technical and creative terms.\n\n"
@@ -176,7 +253,7 @@ def render() -> None:
         with st.spinner("Analyzing image..."):
             answer, thought = stream_response(
                 client,
-                model.strip(),
+                effective_model,
                 messages,
                 phase1_thought_placeholder,
                 phase1_answer_placeholder,
@@ -203,6 +280,8 @@ def render() -> None:
                 type=["png", "jpg", "jpeg", "webp"],
                 key="correction_image",
             )
+            if correction_image is not None:
+                st.image(correction_image, caption="Correction image preview", use_container_width=True)
             correction_notes = st.text_area(
                 "Correction Notes",
                 key="correction_notes",
@@ -223,17 +302,17 @@ def render() -> None:
                 phase2_answer_placeholder.markdown(st.session_state["phase2_output"])
 
         if correction_clicked:
-            if not api_key.strip():
-                st.error("Please provide an API key.")
+            if not effective_api_key:
+                st.error("Please provide an API key in the sidebar or set OPENAI_API_KEY in .env.")
                 return
-            if not model.strip():
+            if not effective_model:
                 st.error("Please provide a model name.")
                 return
             if correction_image is None:
                 st.error("Please upload a correction image.")
                 return
 
-            client = OpenAI(api_key=api_key.strip(), base_url=base_url.strip())
+            client = OpenAI(api_key=effective_api_key, base_url=effective_base_url)
 
             correction_text = (
                 "Use this new image and correction notes to refine your previous analysis.\n\n"
@@ -247,7 +326,7 @@ def render() -> None:
             with st.spinner("Applying correction..."):
                 answer, thought = stream_response(
                     client,
-                    model.strip(),
+                    effective_model,
                     messages,
                     phase2_thought_placeholder,
                     phase2_answer_placeholder,

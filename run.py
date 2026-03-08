@@ -115,15 +115,20 @@ def stream_response(
     messages: list[dict[str, Any]],
     thought_placeholder: Any,
     answer_placeholder: Any,
+    reasoning_effort: str | None = None,
 ) -> Tuple[str, str]:
     answer = ""
     thought = ""
 
-    stream = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        stream=True,
-    )
+    request_kwargs: dict[str, Any] = {
+        "model": model,
+        "messages": messages,
+        "stream": True,
+    }
+    if reasoning_effort:
+        request_kwargs["reasoning_effort"] = reasoning_effort
+
+    stream = client.chat.completions.create(**request_kwargs)
 
     for chunk in stream:
         text_delta, reasoning_delta = extract_deltas(chunk)
@@ -174,15 +179,33 @@ def render() -> None:
             value="",
             placeholder=f"Leave empty to use default: {DEFAULT_MODEL}",
         )
+        reasoning_effort_input = st.selectbox(
+            "Reasoning Effort",
+            options=["default", "minimal", "low", "medium", "high"],
+            index=0,
+            help="For reasoning-capable models/providers. 'default' sends no explicit setting. 'minimal' maps to 'low' for compatibility.",
+        )
 
         effective_base_url = base_url_input.strip() or DEFAULT_BASE_URL
         effective_model = model_input.strip() or DEFAULT_MODEL
+        if reasoning_effort_input == "default":
+            effective_reasoning_effort = None
+        elif reasoning_effort_input == "minimal":
+            # Chat Completions reasoning_effort is typically low/medium/high.
+            # Keep "minimal" as a UX alias for lowest effort while preserving compatibility.
+            effective_reasoning_effort = "low"
+        else:
+            effective_reasoning_effort = reasoning_effort_input
 
         st.caption(
             f"Endpoint in use: {'Sidebar override' if base_url_input.strip() else 'config.py default'}"
         )
         st.caption(
             f"Model in use: {'Sidebar override' if model_input.strip() else 'config.py default'}"
+        )
+        st.caption(
+            "Reasoning effort in use: "
+            f"{reasoning_effort_input}"
         )
 
         system_prompt_override = st.text_area(
@@ -257,6 +280,7 @@ def render() -> None:
                 messages,
                 phase1_thought_placeholder,
                 phase1_answer_placeholder,
+                reasoning_effort=effective_reasoning_effort,
             )
 
         st.session_state["phase1_done"] = True
@@ -330,6 +354,7 @@ def render() -> None:
                     messages,
                     phase2_thought_placeholder,
                     phase2_answer_placeholder,
+                    reasoning_effort=effective_reasoning_effort,
                 )
 
             messages.append({"role": "assistant", "content": answer})

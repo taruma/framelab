@@ -85,6 +85,11 @@ uv run run.py
   - You can override for OpenAI-compatible providers (local, OpenRouter, Groq, etc.)
 - **Model Name**:
   - If sidebar is left empty, app uses `DEFAULT_MODEL` from `config.py`
+- **Reasoning Effort**:
+  - Options: `default`, `minimal`, `low`, `medium`, `high`
+  - `default` sends no explicit reasoning effort parameter
+  - `minimal` maps to `low` (compatibility alias for "least thinking")
+  - `low`/`medium`/`high` send `reasoning_effort` for reasoning-capable models/providers
 - **System Prompt Override (optional)**:
   - If empty, app uses default prompt content from `system_prompt.txt`
 
@@ -168,6 +173,8 @@ This conversation is persisted in `st.session_state`:
 - `.env.example` — sample env variable template
 - `pyproject.toml` — minimal dependencies
 - `AGENT.md` — contributor/iteration guide for future changes
+
+
 
 
 

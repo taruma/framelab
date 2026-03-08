@@ -1,11 +1,6 @@
 # FrameLab
 
-Lightweight multimodal AI web app built with **Python + Streamlit + OpenAI SDK**, designed for:
-
-1. **Initial image analysis** (reference image + optional context)
-2. **Correction loop** (new/incorrect image + correction notes)
-
-The app streams responses live and can display model reasoning/thinking output (when the endpoint/model provides it).
+FrameLab is a lightweight multimodal AI web app for cinematic image analysis. It accepts a reference image with optional context, streams detailed technical breakdowns (covering composition, lighting, and optics), and supports a correction loop where users can submit a new image with notes to refine the analysis. Built with Python + Streamlit + OpenAI SDK, it displays live streaming output, model reasoning/thinking, and token usage while supporting any OpenAI-compatible endpoint.
 
 ---
 

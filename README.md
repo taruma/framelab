@@ -2,6 +2,8 @@
 
 FrameLab is a lightweight multimodal AI web app for cinematic image analysis. It accepts a reference image with optional context, streams detailed technical breakdowns (covering composition, lighting, and optics), and supports a correction loop where users can submit a new image with notes to refine the analysis. Built with Python + Streamlit + OpenAI SDK, it displays live streaming output, model reasoning/thinking, and token usage while supporting any OpenAI-compatible endpoint.
 
+> **⚙️ Default Configuration**: Currently uses **BytePlus** endpoint (`https://ark.ap-southeast.bytepluses.com/api/v3`) with **seed-2-0-lite** model. Modify `config.py` or use the sidebar to change to your preferred provider and model.
+
 ---
 
 ## Features

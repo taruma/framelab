@@ -1,4 +1,4 @@
-# Cinebot
+# FrameLab
 
 Lightweight multimodal AI web app built with **Python + Streamlit + OpenAI SDK**, designed for:
 

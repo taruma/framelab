@@ -21,6 +21,7 @@ The app streams responses live and can display model reasoning/thinking output (
 - Uploaded image previews for both Phase 1 and Phase 2
 - Real-time streaming output in UI
 - Thought/reasoning stream shown in **Thought Process** expander
+- Token usage summary (input/output/total) shown after successful responses when provider returns usage
 - Default request path uses **Responses API** (`client.responses.create`)
 - Automatic fallback to **Chat Completions** if Responses is unsupported/fails
 - Two-phase workflow:
@@ -104,6 +105,7 @@ uv run run.py
 Right panel shows:
 - **Thought Process** (if `reasoning_content`/reasoning deltas are returned)
 - Final streamed analysis
+- Usage summary (`input`, `output`, `total` tokens) when provided by the endpoint/model
 
 ### 3) Phase 2 — Correction Loop
 
@@ -132,7 +134,9 @@ This conversation is persisted in `st.session_state`:
 - `phase1_done`
 - `conversation_messages`
 - `phase1_output`, `phase1_reasoning`
+- `phase1_usage`
 - `phase2_output`, `phase2_reasoning`
+- `phase2_usage`
 
 ---
 
@@ -156,6 +160,10 @@ This conversation is persisted in `st.session_state`:
 - **Responses API compatibility issues**
   - Some OpenAI-compatible providers/models may not fully support Responses stream events.
   - App will automatically retry the same request via Chat Completions.
+
+- **Usage metrics not shown**
+  - Some providers/models do not return usage in streaming mode.
+  - App will show a fallback message when usage metadata is unavailable.
 
 - **Image upload issues**
   - Supported: `png`, `jpg`, `jpeg`, `webp`.
@@ -182,6 +190,7 @@ This conversation is persisted in `st.session_state`:
 - `.env.example` — sample env variable template
 - `pyproject.toml` — minimal dependencies
 - `AGENTS.md` — contributor/iteration guide for future changes
+
 
 
 

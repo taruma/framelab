@@ -10,13 +10,35 @@ from app_state import (
     PHASE1_DONE,
     PHASE1_OUTPUT,
     PHASE1_REASONING,
+    PHASE1_USAGE,
     PHASE2_OUTPUT,
     PHASE2_REASONING,
+    PHASE2_USAGE,
     init_state,
 )
 from conversation import make_user_message
 from config import DEFAULT_BASE_URL, DEFAULT_MODEL
 from llm_streaming import stream_response
+
+
+def render_usage(usage: dict | None, placeholder: st.delta_generator.DeltaGenerator) -> None:
+    if not usage:
+        placeholder.caption("Usage: not returned by this model/provider.")
+        return
+
+    input_tokens = usage.get("input_tokens")
+    output_tokens = usage.get("output_tokens")
+    total_tokens = usage.get("total_tokens")
+
+    parts = ["Usage"]
+    if isinstance(input_tokens, int):
+        parts.append(f"input: {input_tokens}")
+    if isinstance(output_tokens, int):
+        parts.append(f"output: {output_tokens}")
+    if isinstance(total_tokens, int):
+        parts.append(f"total: {total_tokens}")
+
+    placeholder.caption(" · ".join(parts))
 
 
 def load_env_file(path: str = ".env") -> None:
@@ -140,11 +162,13 @@ def render() -> None:
         phase1_thought_expander = st.expander("Thought Process", expanded=True)
         phase1_thought_placeholder = phase1_thought_expander.empty()
         phase1_answer_placeholder = st.empty()
+        phase1_usage_placeholder = st.empty()
 
         if st.session_state[PHASE1_REASONING]:
             phase1_thought_placeholder.markdown(st.session_state[PHASE1_REASONING])
         if st.session_state[PHASE1_OUTPUT]:
             phase1_answer_placeholder.markdown(st.session_state[PHASE1_OUTPUT])
+            render_usage(st.session_state[PHASE1_USAGE], phase1_usage_placeholder)
 
     if analyze_clicked:
         if not effective_api_key:
@@ -170,7 +194,7 @@ def render() -> None:
         messages.append(initial_user_message)
 
         with st.spinner("Analyzing image..."):
-            answer, thought = stream_response(
+            answer, thought, usage = stream_response(
                 client,
                 effective_model,
                 messages,
@@ -178,12 +202,15 @@ def render() -> None:
                 phase1_answer_placeholder,
                 reasoning_effort=effective_reasoning_effort,
             )
+        render_usage(usage, phase1_usage_placeholder)
 
         st.session_state[PHASE1_DONE] = True
         st.session_state[PHASE1_OUTPUT] = answer
         st.session_state[PHASE1_REASONING] = thought
+        st.session_state[PHASE1_USAGE] = usage
         st.session_state[PHASE2_OUTPUT] = ""
         st.session_state[PHASE2_REASONING] = ""
+        st.session_state[PHASE2_USAGE] = None
 
         st.session_state[CONVERSATION_MESSAGES] = messages + [
             {"role": "assistant", "content": answer}
@@ -215,11 +242,13 @@ def render() -> None:
             phase2_thought_expander = st.expander("Thought Process", expanded=True)
             phase2_thought_placeholder = phase2_thought_expander.empty()
             phase2_answer_placeholder = st.empty()
+            phase2_usage_placeholder = st.empty()
 
             if st.session_state[PHASE2_REASONING]:
                 phase2_thought_placeholder.markdown(st.session_state[PHASE2_REASONING])
             if st.session_state[PHASE2_OUTPUT]:
                 phase2_answer_placeholder.markdown(st.session_state[PHASE2_OUTPUT])
+                render_usage(st.session_state[PHASE2_USAGE], phase2_usage_placeholder)
 
         if correction_clicked:
             if not effective_api_key:
@@ -244,7 +273,7 @@ def render() -> None:
             messages.append(correction_user_message)
 
             with st.spinner("Applying correction..."):
-                answer, thought = stream_response(
+                answer, thought, usage = stream_response(
                     client,
                     effective_model,
                     messages,
@@ -252,11 +281,13 @@ def render() -> None:
                     phase2_answer_placeholder,
                     reasoning_effort=effective_reasoning_effort,
                 )
+            render_usage(usage, phase2_usage_placeholder)
 
             messages.append({"role": "assistant", "content": answer})
             st.session_state[CONVERSATION_MESSAGES] = messages
             st.session_state[PHASE2_OUTPUT] = answer
             st.session_state[PHASE2_REASONING] = thought
+            st.session_state[PHASE2_USAGE] = usage
 
 
 if __name__ == "__main__":

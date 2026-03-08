@@ -173,12 +173,16 @@ This conversation is persisted in `st.session_state`:
 
 ## Project Files
 
-- `run.py` — complete application (single-file architecture)
+- `run.py` — Streamlit UI + app bootstrap (`uv run run.py`)
+- `app_state.py` — session-state keys and initialization
+- `conversation.py` — multimodal message construction/conversion helpers
+- `llm_streaming.py` — streaming transport/delta parsing/fallback flow
 - `config.py` — default endpoint/model configuration
 - `system_prompt.txt` — default system prompt content
 - `.env.example` — sample env variable template
 - `pyproject.toml` — minimal dependencies
-- `AGENT.md` — contributor/iteration guide for future changes
+- `AGENTS.md` — contributor/iteration guide for future changes
+
 
 
 

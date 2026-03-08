@@ -1,13 +1,22 @@
-import base64
-import mimetypes
 import os
 import sys
-from typing import Any, Tuple
+from typing import Tuple
 
 import streamlit as st
 from openai import OpenAI
 
+from app_state import (
+    CONVERSATION_MESSAGES,
+    PHASE1_DONE,
+    PHASE1_OUTPUT,
+    PHASE1_REASONING,
+    PHASE2_OUTPUT,
+    PHASE2_REASONING,
+    init_state,
+)
+from conversation import make_user_message
 from config import DEFAULT_BASE_URL, DEFAULT_MODEL
+from llm_streaming import stream_response
 
 
 def load_env_file(path: str = ".env") -> None:
@@ -39,208 +48,6 @@ def load_system_prompt(path: str = "system_prompt.txt") -> Tuple[str, str]:
         return "", f"System prompt file not found: {path}"
     except OSError as exc:
         return "", f"Failed to read system prompt file ({path}): {exc}"
-
-
-def init_state() -> None:
-    defaults = {
-        "phase1_done": False,
-        "conversation_messages": [],
-        "phase1_output": "",
-        "phase1_reasoning": "",
-        "phase2_output": "",
-        "phase2_reasoning": "",
-    }
-    for key, value in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = value
-
-
-def to_data_url(uploaded_file: Any) -> str:
-    raw = uploaded_file.getvalue()
-    mime = uploaded_file.type or mimetypes.guess_type(uploaded_file.name)[0] or "image/png"
-    encoded = base64.b64encode(raw).decode("utf-8")
-    return f"data:{mime};base64,{encoded}"
-
-
-def make_user_message(image_file: Any, text: str) -> dict[str, Any]:
-    content = []
-    if text.strip():
-        content.append({"type": "text", "text": text.strip()})
-    if image_file is not None:
-        content.append({"type": "image_url", "image_url": {"url": to_data_url(image_file)}})
-    if not content:
-        content.append({"type": "text", "text": "No extra text provided."})
-    return {"role": "user", "content": content}
-
-
-def messages_to_responses_input(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    converted: list[dict[str, Any]] = []
-
-    for message in messages:
-        role = message.get("role", "user")
-        content = message.get("content")
-        converted_content: list[dict[str, Any]] = []
-
-        if isinstance(content, str):
-            item_type = "output_text" if role == "assistant" else "input_text"
-            if content.strip():
-                converted_content.append({"type": item_type, "text": content})
-
-        elif isinstance(content, list):
-            for item in content:
-                if not isinstance(item, dict):
-                    continue
-
-                item_type = item.get("type")
-                if item_type == "text":
-                    text = item.get("text") or item.get("content") or ""
-                    if text:
-                        text_type = "output_text" if role == "assistant" else "input_text"
-                        converted_content.append({"type": text_type, "text": text})
-
-                elif item_type == "image_url":
-                    image_obj = item.get("image_url")
-                    if isinstance(image_obj, dict):
-                        image_url = image_obj.get("url")
-                        if image_url:
-                            converted_content.append({"type": "input_image", "image_url": image_url})
-
-        if not converted_content and role != "assistant":
-            converted_content = [{"type": "input_text", "text": "No content provided."}]
-
-        converted.append({"role": role, "content": converted_content})
-
-    return converted
-
-
-def extract_deltas(chunk: Any) -> Tuple[str, str]:
-    text_delta = ""
-    reasoning_delta = ""
-
-    try:
-        data = chunk.model_dump()
-    except Exception:
-        return "", ""
-
-    choices = data.get("choices") or []
-    if not choices:
-        return "", ""
-
-    delta = choices[0].get("delta") or {}
-    content = delta.get("content")
-    reasoning = delta.get("reasoning_content") or delta.get("reasoning")
-
-    if isinstance(content, str):
-        text_delta += content
-    elif isinstance(content, list):
-        for item in content:
-            if not isinstance(item, dict):
-                continue
-            text_delta += item.get("text") or item.get("content") or ""
-
-    if isinstance(reasoning, str):
-        reasoning_delta += reasoning
-    elif isinstance(reasoning, list):
-        for item in reasoning:
-            if not isinstance(item, dict):
-                continue
-            reasoning_delta += item.get("text") or item.get("content") or ""
-
-    return text_delta, reasoning_delta
-
-
-def extract_response_deltas(event: Any) -> Tuple[str, str]:
-    text_delta = ""
-    reasoning_delta = ""
-
-    try:
-        data = event.model_dump()
-    except Exception:
-        return "", ""
-
-    event_type = str(data.get("type") or "")
-    delta = data.get("delta")
-
-    if isinstance(delta, str):
-        event_type_lower = event_type.lower()
-        if "output_text" in event_type_lower:
-            text_delta += delta
-        elif any(token in event_type_lower for token in ["reason", "think", "summary"]):
-            reasoning_delta += delta
-
-    return text_delta, reasoning_delta
-
-
-def stream_response(
-    client: OpenAI,
-    model: str,
-    messages: list[dict[str, Any]],
-    thought_placeholder: Any,
-    answer_placeholder: Any,
-    reasoning_effort: str | None = None,
-) -> Tuple[str, str]:
-    answer = ""
-    thought = ""
-
-    responses_request_kwargs: dict[str, Any] = {
-        "model": model,
-        "input": messages_to_responses_input(messages),
-        "stream": True,
-    }
-    if reasoning_effort:
-        responses_request_kwargs["reasoning"] = {"effort": reasoning_effort}
-
-    try:
-        stream = client.responses.create(**responses_request_kwargs)
-
-        for event in stream:
-            text_delta, reasoning_delta = extract_response_deltas(event)
-
-            if reasoning_delta:
-                thought += reasoning_delta
-                thought_placeholder.markdown(thought)
-
-            if text_delta:
-                answer += text_delta
-                answer_placeholder.markdown(answer)
-
-        if not thought:
-            thought_placeholder.caption("No reasoning/thought stream was returned by this model.")
-
-        return answer, thought
-    except Exception:
-        # Fallback path for providers/endpoints without Responses API support.
-        answer = ""
-        thought = ""
-        thought_placeholder.empty()
-        answer_placeholder.empty()
-        st.caption("Responses API failed on this endpoint/model. Falling back to Chat Completions.")
-
-    request_kwargs: dict[str, Any] = {
-        "model": model,
-        "messages": messages,
-        "stream": True,
-    }
-    if reasoning_effort:
-        request_kwargs["reasoning_effort"] = reasoning_effort
-
-    stream = client.chat.completions.create(**request_kwargs)
-
-    for chunk in stream:
-        text_delta, reasoning_delta = extract_deltas(chunk)
-
-        if reasoning_delta:
-            thought += reasoning_delta
-            thought_placeholder.markdown(thought)
-
-        if text_delta:
-            answer += text_delta
-            answer_placeholder.markdown(answer)
-
-    if not thought:
-        thought_placeholder.caption("No reasoning/thought stream was returned by this model.")
-
-    return answer, thought
 
 
 def render() -> None:
@@ -334,10 +141,10 @@ def render() -> None:
         phase1_thought_placeholder = phase1_thought_expander.empty()
         phase1_answer_placeholder = st.empty()
 
-        if st.session_state["phase1_reasoning"]:
-            phase1_thought_placeholder.markdown(st.session_state["phase1_reasoning"])
-        if st.session_state["phase1_output"]:
-            phase1_answer_placeholder.markdown(st.session_state["phase1_output"])
+        if st.session_state[PHASE1_REASONING]:
+            phase1_thought_placeholder.markdown(st.session_state[PHASE1_REASONING])
+        if st.session_state[PHASE1_OUTPUT]:
+            phase1_answer_placeholder.markdown(st.session_state[PHASE1_OUTPUT])
 
     if analyze_clicked:
         if not effective_api_key:
@@ -372,17 +179,17 @@ def render() -> None:
                 reasoning_effort=effective_reasoning_effort,
             )
 
-        st.session_state["phase1_done"] = True
-        st.session_state["phase1_output"] = answer
-        st.session_state["phase1_reasoning"] = thought
-        st.session_state["phase2_output"] = ""
-        st.session_state["phase2_reasoning"] = ""
+        st.session_state[PHASE1_DONE] = True
+        st.session_state[PHASE1_OUTPUT] = answer
+        st.session_state[PHASE1_REASONING] = thought
+        st.session_state[PHASE2_OUTPUT] = ""
+        st.session_state[PHASE2_REASONING] = ""
 
-        st.session_state["conversation_messages"] = messages + [
+        st.session_state[CONVERSATION_MESSAGES] = messages + [
             {"role": "assistant", "content": answer}
         ]
 
-    if st.session_state["phase1_done"]:
+    if st.session_state[PHASE1_DONE]:
         st.divider()
         corr_left, corr_right = st.columns([1, 1.2], gap="large")
 
@@ -409,10 +216,10 @@ def render() -> None:
             phase2_thought_placeholder = phase2_thought_expander.empty()
             phase2_answer_placeholder = st.empty()
 
-            if st.session_state["phase2_reasoning"]:
-                phase2_thought_placeholder.markdown(st.session_state["phase2_reasoning"])
-            if st.session_state["phase2_output"]:
-                phase2_answer_placeholder.markdown(st.session_state["phase2_output"])
+            if st.session_state[PHASE2_REASONING]:
+                phase2_thought_placeholder.markdown(st.session_state[PHASE2_REASONING])
+            if st.session_state[PHASE2_OUTPUT]:
+                phase2_answer_placeholder.markdown(st.session_state[PHASE2_OUTPUT])
 
         if correction_clicked:
             if not effective_api_key:
@@ -433,7 +240,7 @@ def render() -> None:
             )
             correction_user_message = make_user_message(correction_image, correction_text)
 
-            messages = list(st.session_state["conversation_messages"])
+            messages = list(st.session_state[CONVERSATION_MESSAGES])
             messages.append(correction_user_message)
 
             with st.spinner("Applying correction..."):
@@ -447,9 +254,9 @@ def render() -> None:
                 )
 
             messages.append({"role": "assistant", "content": answer})
-            st.session_state["conversation_messages"] = messages
-            st.session_state["phase2_output"] = answer
-            st.session_state["phase2_reasoning"] = thought
+            st.session_state[CONVERSATION_MESSAGES] = messages
+            st.session_state[PHASE2_OUTPUT] = answer
+            st.session_state[PHASE2_REASONING] = thought
 
 
 if __name__ == "__main__":

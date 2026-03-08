@@ -18,7 +18,6 @@ The app must remain easy to run and easy to modify.
 
 ## 2) Hard Constraints (Do Not Break)
 
-- Keep implementation in **single-file `run.py`** unless explicitly asked otherwise.
 - Keep dependencies minimal: **only `streamlit` and `openai`** (plus Python stdlib).
 - Primary run command must remain: **`uv run run.py`**.
 - Preserve OpenAI-compatible flexibility:
@@ -26,24 +25,27 @@ The app must remain easy to run and easy to modify.
   - user-provided base URL/endpoint
   - user-provided model name
 
+Keep the current lightweight modular layout unless explicitly asked otherwise.
+
 ---
 
-## 3) Current Architecture (run.py)
+## 3) Current Architecture
 
-- `init_state()`
-  - Initializes Streamlit session keys for phase state and outputs.
-- `to_data_url(uploaded_file)`
-  - Converts uploaded image bytes to base64 `data:` URL.
-- `make_user_message(image_file, text)`
-  - Builds multimodal user message with text + image.
-- `extract_deltas(chunk)`
-  - Extracts normal content deltas and reasoning deltas from streaming chunks.
-- `stream_response(...)`
-  - Executes streaming chat completion and updates UI placeholders live.
-- `render()`
-  - Full UI: sidebar config, phase 1, phase 2, validation, state writes.
-- `__main__` block
-  - Handles `uv run run.py` bootstrap and avoids Streamlit runtime recursion.
+- `run.py`
+  - Streamlit UI layout and app bootstrap for `uv run run.py`
+  - Sidebar config handling (API key, endpoint, model, reasoning effort, system prompt override)
+  - Phase 1/Phase 2 orchestration and usage rendering
+- `app_state.py`
+  - Session-state key constants and `init_state()` defaults
+- `conversation.py`
+  - Multimodal message helpers and conversion to Responses API input format
+- `llm_streaming.py`
+  - Streaming transport and delta parsing
+  - **Responses API first**, with automatic fallback to Chat Completions
+- `config.py`
+  - Default base URL and default model
+- `system_prompt.txt`
+  - Externalized default system prompt
 
 ---
 
@@ -57,6 +59,7 @@ Must preserve:
 - Right-side output order:
   1) `Thought Process` expander
   2) final streamed response
+  3) usage caption (when provided)
 - Streaming should feel live (incremental updates, not batch render).
 
 ---
@@ -68,7 +71,9 @@ Session keys currently used:
 - `phase1_done`
 - `conversation_messages`
 - `phase1_output`, `phase1_reasoning`
+- `phase1_usage`
 - `phase2_output`, `phase2_reasoning`
+- `phase2_usage`
 
 Correction payload message order must remain:
 
@@ -83,11 +88,10 @@ Any refactor must preserve this logic.
 
 ## 6) API Compatibility Notes
 
-- App currently uses `client.chat.completions.create(..., stream=True)`.
-- Different providers may vary in reasoning fields; current parser handles common variants:
-  - `delta.content`
-  - `delta.reasoning_content`
-  - `delta.reasoning`
+- Default streaming path uses `client.responses.create(..., stream=True)`.
+- If Responses API fails/unsupported, app automatically falls back to
+  `client.chat.completions.create(..., stream=True)`.
+- Different providers may vary in streaming/usage/reasoning fields; keep parsers resilient.
 - If adding provider-specific compatibility, keep defaults simple and avoid adding non-essential dependencies.
 
 ---
@@ -109,7 +113,6 @@ When making changes:
 
 Only implement if requested:
 
-- Add optional Responses API mode fallback while preserving current default.
 - Add “Reset conversation” button.
 - Add export/download for final analysis and correction history.
 - Add provider preset templates (OpenAI/OpenRouter/Groq/local) without hard-coding secrets.
@@ -125,4 +128,6 @@ Before finishing any iteration, verify:
 - [ ] Thought Process expander updates when reasoning stream exists
 - [ ] Phase 2 appears only after Phase 1
 - [ ] Correction call includes prior assistant output in context
-- [ ] `README.md` and `AGENT.md` are up to date
+- [ ] Responses API path works, or fallback to Chat Completions works clearly
+- [ ] Usage caption behavior is correct (shown when available, fallback message otherwise)
+- [ ] `README.md` and `AGENTS.md` are up to date

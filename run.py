@@ -1,8 +1,12 @@
 import os
+import re
+import json
 import sys
+import html as html_lib
 from typing import Tuple
 
 import streamlit as st
+from streamlit.components.v1 import html as st_html
 from openai import OpenAI
 
 from app_state import (
@@ -70,6 +74,57 @@ def load_system_prompt(path: str = "system_prompt.txt") -> Tuple[str, str]:
         return "", f"System prompt file not found: {path}"
     except OSError as exc:
         return "", f"Failed to read system prompt file ({path}): {exc}"
+
+
+def markdown_to_plain_text(text: str) -> str:
+    cleaned = text.replace("\r\n", "\n")
+    cleaned = re.sub(r"```[\w+-]*\n?", "", cleaned)
+    cleaned = cleaned.replace("```", "")
+    cleaned = re.sub(r"`([^`]+)`", r"\1", cleaned)
+    cleaned = re.sub(r"!\[([^\]]*)\]\([^\)]*\)", r"\1", cleaned)
+    cleaned = re.sub(r"\[([^\]]+)\]\([^\)]*\)", r"\1", cleaned)
+    cleaned = re.sub(r"^\s{0,3}#{1,6}\s*", "", cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r"^\s{0,3}>\s?", "", cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r"^\s*([-*+]|\d+\.)\s+", "", cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r"^\s*([-*_]\s*){3,}$", "", cleaned, flags=re.MULTILINE)
+    cleaned = re.sub(r"\*\*(.*?)\*\*", r"\1", cleaned)
+    cleaned = re.sub(r"__(.*?)__", r"\1", cleaned)
+    cleaned = re.sub(r"\*(.*?)\*", r"\1", cleaned)
+    cleaned = re.sub(r"_(.*?)_", r"\1", cleaned)
+    cleaned = re.sub(r"~~(.*?)~~", r"\1", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
+
+def render_copy_button(label: str, text: str, key: str) -> None:
+    copy_text = markdown_to_plain_text(text)
+    button_id = f"copy-btn-{key}"
+    status_id = f"copy-status-{key}"
+    st_html(
+        f"""
+        <div style=\"display:flex;align-items:center;gap:8px;margin-top:4px;\">
+          <button id=\"{button_id}\" style=\"padding:0.35rem 0.7rem;border:1px solid #555;border-radius:0.4rem;background:#1f1f1f;color:#f3f3f3;cursor:pointer;\">{html_lib.escape(label)}</button>
+          <span id=\"{status_id}\" style=\"font-size:0.85rem;color:#6c757d;\"></span>
+        </div>
+        <script>
+          const textToCopy = {json.dumps(copy_text)};
+          const btn = document.getElementById({json.dumps(button_id)});
+          const status = document.getElementById({json.dumps(status_id)});
+          if (btn && status) {{
+            btn.onclick = async () => {{
+              try {{
+                await navigator.clipboard.writeText(textToCopy);
+                status.textContent = 'Copied';
+              }} catch (e) {{
+                status.textContent = 'Copy failed';
+              }}
+              setTimeout(() => {{ status.textContent = ''; }}, 1200);
+            }};
+          }}
+        </script>
+        """,
+        height=44,
+    )
 
 
 def render() -> None:
@@ -163,12 +218,19 @@ def render() -> None:
         phase1_thought_placeholder = phase1_thought_expander.empty()
         phase1_answer_placeholder = st.empty()
         phase1_usage_placeholder = st.empty()
+        phase1_copy_placeholder = st.empty()
 
         if st.session_state[PHASE1_REASONING]:
             phase1_thought_placeholder.markdown(st.session_state[PHASE1_REASONING])
         if st.session_state[PHASE1_OUTPUT]:
             phase1_answer_placeholder.markdown(st.session_state[PHASE1_OUTPUT])
             render_usage(st.session_state[PHASE1_USAGE], phase1_usage_placeholder)
+            with phase1_copy_placeholder.container():
+                render_copy_button(
+                    "Copy Output (plain text)",
+                    st.session_state[PHASE1_OUTPUT],
+                    key="phase1_copy_button",
+                )
 
     if analyze_clicked:
         if not effective_api_key:
@@ -203,6 +265,8 @@ def render() -> None:
                 reasoning_effort=effective_reasoning_effort,
             )
         render_usage(usage, phase1_usage_placeholder)
+        with phase1_copy_placeholder.container():
+            render_copy_button("Copy Output (plain text)", answer, key="phase1_copy_button")
 
         st.session_state[PHASE1_DONE] = True
         st.session_state[PHASE1_OUTPUT] = answer
@@ -243,12 +307,19 @@ def render() -> None:
             phase2_thought_placeholder = phase2_thought_expander.empty()
             phase2_answer_placeholder = st.empty()
             phase2_usage_placeholder = st.empty()
+            phase2_copy_placeholder = st.empty()
 
             if st.session_state[PHASE2_REASONING]:
                 phase2_thought_placeholder.markdown(st.session_state[PHASE2_REASONING])
             if st.session_state[PHASE2_OUTPUT]:
                 phase2_answer_placeholder.markdown(st.session_state[PHASE2_OUTPUT])
                 render_usage(st.session_state[PHASE2_USAGE], phase2_usage_placeholder)
+                with phase2_copy_placeholder.container():
+                    render_copy_button(
+                        "Copy Updated Analysis (plain text)",
+                        st.session_state[PHASE2_OUTPUT],
+                        key="phase2_copy_button",
+                    )
 
         if correction_clicked:
             if not effective_api_key:
@@ -282,6 +353,12 @@ def render() -> None:
                     reasoning_effort=effective_reasoning_effort,
                 )
             render_usage(usage, phase2_usage_placeholder)
+            with phase2_copy_placeholder.container():
+                render_copy_button(
+                    "Copy Updated Analysis (plain text)",
+                    answer,
+                    key="phase2_copy_button",
+                )
 
             messages.append({"role": "assistant", "content": answer})
             st.session_state[CONVERSATION_MESSAGES] = messages

@@ -21,6 +21,7 @@ The app streams responses live and can display model reasoning/thinking output (
 - Uploaded image previews for both Phase 1 and Phase 2
 - Real-time streaming output in UI
 - Thought/reasoning stream shown in **Thought Process** expander
+- One-click copy buttons for Phase 1 and Phase 2 results (copied as plain text)
 - Token usage summary (input/output/total) shown after successful responses when provider returns usage
 - Default request path uses **Responses API** (`client.responses.create`)
 - Automatic fallback to **Chat Completions** if Responses is unsupported/fails
@@ -106,6 +107,7 @@ Right panel shows:
 - **Thought Process** (if `reasoning_content`/reasoning deltas are returned)
 - Final streamed analysis
 - Usage summary (`input`, `output`, `total` tokens) when provided by the endpoint/model
+- A **Copy Output (plain text)** button for one-click copying without markdown formatting
 
 ### 3) Phase 2 — Correction Loop
 
@@ -117,6 +119,8 @@ Appears only after Phase 1 completes.
 - Click **Submit Correction**
 
 Model receives prior context and returns an updated analysis.
+
+Right panel also provides a **Copy Updated Analysis (plain text)** button for one-click copying of the latest corrected output.
 
 ---
 
@@ -190,6 +194,8 @@ This conversation is persisted in `st.session_state`:
 - `.env.example` — sample env variable template
 - `pyproject.toml` — minimal dependencies
 - `AGENTS.md` — contributor/iteration guide for future changes
+
+
 
 
 

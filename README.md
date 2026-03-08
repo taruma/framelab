@@ -25,6 +25,9 @@ The app streams responses live and can display model reasoning/thinking output (
 - Token usage summary (input/output/total) shown after successful responses when provider returns usage
 - Default request path uses **Responses API** (`client.responses.create`)
 - Automatic fallback to **Chat Completions** if Responses is unsupported/fails
+- Displays transport path used per request (**Responses API** or **Chat Completions fallback**)
+- Surfaces underlying exception messages when Responses/fallback fail for easier debugging
+- Auto-disables Responses API for current session when provider reports schema mismatch (e.g. missing `input.status`)
 - Two-phase workflow:
   - Phase 1: Analyze reference image
   - Phase 2: Submit correction image + notes
@@ -164,6 +167,12 @@ This conversation is persisted in `st.session_state`:
 - **Responses API compatibility issues**
   - Some OpenAI-compatible providers/models may not fully support Responses stream events.
   - App will automatically retry the same request via Chat Completions.
+  - UI now shows the underlying Responses error message and the final transport used.
+  - If provider reports a known schema mismatch (for example missing `input.status`), Responses API is auto-disabled for the current session and app will use Chat Completions directly on next requests.
+
+- **Phase 2 fails after Phase 1 succeeds**
+  - This can still happen when Phase 2 payload is larger (prior answer + additional image + notes).
+  - Check the displayed transport/error details in UI to identify whether failure is in Responses, fallback, or both.
 
 - **Usage metrics not shown**
   - Some providers/models do not return usage in streaming mode.
@@ -194,6 +203,8 @@ This conversation is persisted in `st.session_state`:
 - `.env.example` — sample env variable template
 - `pyproject.toml` — minimal dependencies
 - `AGENTS.md` — contributor/iteration guide for future changes
+
+
 
 
 

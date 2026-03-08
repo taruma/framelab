@@ -9,6 +9,7 @@ PHASE1_USAGE = "phase1_usage"
 PHASE2_OUTPUT = "phase2_output"
 PHASE2_REASONING = "phase2_reasoning"
 PHASE2_USAGE = "phase2_usage"
+PREFER_RESPONSES_API = "prefer_responses_api"
 
 
 def init_state() -> None:
@@ -21,6 +22,7 @@ def init_state() -> None:
         PHASE2_OUTPUT: "",
         PHASE2_REASONING: "",
         PHASE2_USAGE: None,
+        PREFER_RESPONSES_API: True,
     }
     for key, value in defaults.items():
         if key not in st.session_state:

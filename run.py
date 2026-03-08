@@ -18,6 +18,7 @@ from app_state import (
     PHASE2_OUTPUT,
     PHASE2_REASONING,
     PHASE2_USAGE,
+    PREFER_RESPONSES_API,
     init_state,
 )
 from conversation import make_user_message
@@ -256,14 +257,16 @@ def render() -> None:
         messages.append(initial_user_message)
 
         with st.spinner("Analyzing image..."):
-            answer, thought, usage = stream_response(
+            answer, thought, usage, prefer_responses_api = stream_response(
                 client,
                 effective_model,
                 messages,
                 phase1_thought_placeholder,
                 phase1_answer_placeholder,
                 reasoning_effort=effective_reasoning_effort,
+                prefer_responses_api=st.session_state[PREFER_RESPONSES_API],
             )
+        st.session_state[PREFER_RESPONSES_API] = prefer_responses_api
         render_usage(usage, phase1_usage_placeholder)
         with phase1_copy_placeholder.container():
             render_copy_button("Copy Output (plain text)", answer, key="phase1_copy_button")
@@ -344,14 +347,16 @@ def render() -> None:
             messages.append(correction_user_message)
 
             with st.spinner("Applying correction..."):
-                answer, thought, usage = stream_response(
+                answer, thought, usage, prefer_responses_api = stream_response(
                     client,
                     effective_model,
                     messages,
                     phase2_thought_placeholder,
                     phase2_answer_placeholder,
                     reasoning_effort=effective_reasoning_effort,
+                    prefer_responses_api=st.session_state[PREFER_RESPONSES_API],
                 )
+            st.session_state[PREFER_RESPONSES_API] = prefer_responses_api
             render_usage(usage, phase2_usage_placeholder)
             with phase2_copy_placeholder.container():
                 render_copy_button(

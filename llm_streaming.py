@@ -6,6 +6,19 @@ from openai import OpenAI
 from conversation import messages_to_responses_input
 
 
+def format_exception(exc: Exception) -> str:
+    name = exc.__class__.__name__
+    text = str(exc).strip()
+    if text:
+        return f"{name}: {text}"
+    return name
+
+
+def should_disable_responses_api(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return "input.status" in text and "missing" in text
+
+
 def normalize_usage(raw_usage: Any) -> dict[str, int] | None:
     if not isinstance(raw_usage, dict):
         return None
@@ -226,9 +239,10 @@ def stream_response(
     thought_placeholder: Any,
     answer_placeholder: Any,
     reasoning_effort: str | None = None,
-) -> Tuple[str, str, dict[str, int] | None]:
-    try:
-        return stream_via_responses_api(
+    prefer_responses_api: bool = True,
+) -> Tuple[str, str, dict[str, int] | None, bool]:
+    if not prefer_responses_api:
+        answer, thought, usage = stream_via_chat_completions(
             client,
             model,
             messages,
@@ -236,16 +250,43 @@ def stream_response(
             answer_placeholder,
             reasoning_effort=reasoning_effort,
         )
-    except Exception:
+        st.caption("Transport: Chat Completions (Responses API disabled for this session)")
+        return answer, thought, usage, False
+
+    try:
+        answer, thought, usage = stream_via_responses_api(
+            client,
+            model,
+            messages,
+            thought_placeholder,
+            answer_placeholder,
+            reasoning_effort=reasoning_effort,
+        )
+        st.caption("Transport: Responses API")
+        return answer, thought, usage, True
+    except Exception as responses_exc:
         thought_placeholder.empty()
         answer_placeholder.empty()
         st.caption("Responses API failed on this endpoint/model. Falling back to Chat Completions.")
+        st.warning(f"Responses API error: {format_exception(responses_exc)}")
+        next_prefer_responses_api = not should_disable_responses_api(responses_exc)
+        if not next_prefer_responses_api:
+            st.caption("Responses API auto-disabled for this session due to provider schema mismatch.")
 
-    return stream_via_chat_completions(
-        client,
-        model,
-        messages,
-        thought_placeholder,
-        answer_placeholder,
-        reasoning_effort=reasoning_effort,
-    )
+    try:
+        answer, thought, usage = stream_via_chat_completions(
+            client,
+            model,
+            messages,
+            thought_placeholder,
+            answer_placeholder,
+            reasoning_effort=reasoning_effort,
+        )
+        st.caption("Transport: Chat Completions fallback")
+        return answer, thought, usage, next_prefer_responses_api
+    except Exception as fallback_exc:
+        thought_placeholder.empty()
+        answer_placeholder.empty()
+        st.error("Both Responses API and Chat Completions fallback failed.")
+        st.error(f"Fallback error: {format_exception(fallback_exc)}")
+        return "", "", None, next_prefer_responses_api

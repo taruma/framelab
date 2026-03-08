@@ -73,6 +73,46 @@ def make_user_message(image_file: Any, text: str) -> dict[str, Any]:
     return {"role": "user", "content": content}
 
 
+def messages_to_responses_input(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    converted: list[dict[str, Any]] = []
+
+    for message in messages:
+        role = message.get("role", "user")
+        content = message.get("content")
+        converted_content: list[dict[str, Any]] = []
+
+        if isinstance(content, str):
+            item_type = "output_text" if role == "assistant" else "input_text"
+            if content.strip():
+                converted_content.append({"type": item_type, "text": content})
+
+        elif isinstance(content, list):
+            for item in content:
+                if not isinstance(item, dict):
+                    continue
+
+                item_type = item.get("type")
+                if item_type == "text":
+                    text = item.get("text") or item.get("content") or ""
+                    if text:
+                        text_type = "output_text" if role == "assistant" else "input_text"
+                        converted_content.append({"type": text_type, "text": text})
+
+                elif item_type == "image_url":
+                    image_obj = item.get("image_url")
+                    if isinstance(image_obj, dict):
+                        image_url = image_obj.get("url")
+                        if image_url:
+                            converted_content.append({"type": "input_image", "image_url": image_url})
+
+        if not converted_content and role != "assistant":
+            converted_content = [{"type": "input_text", "text": "No content provided."}]
+
+        converted.append({"role": role, "content": converted_content})
+
+    return converted
+
+
 def extract_deltas(chunk: Any) -> Tuple[str, str]:
     text_delta = ""
     reasoning_delta = ""
@@ -109,6 +149,28 @@ def extract_deltas(chunk: Any) -> Tuple[str, str]:
     return text_delta, reasoning_delta
 
 
+def extract_response_deltas(event: Any) -> Tuple[str, str]:
+    text_delta = ""
+    reasoning_delta = ""
+
+    try:
+        data = event.model_dump()
+    except Exception:
+        return "", ""
+
+    event_type = str(data.get("type") or "")
+    delta = data.get("delta")
+
+    if isinstance(delta, str):
+        event_type_lower = event_type.lower()
+        if "output_text" in event_type_lower:
+            text_delta += delta
+        elif any(token in event_type_lower for token in ["reason", "think", "summary"]):
+            reasoning_delta += delta
+
+    return text_delta, reasoning_delta
+
+
 def stream_response(
     client: OpenAI,
     model: str,
@@ -119,6 +181,40 @@ def stream_response(
 ) -> Tuple[str, str]:
     answer = ""
     thought = ""
+
+    responses_request_kwargs: dict[str, Any] = {
+        "model": model,
+        "input": messages_to_responses_input(messages),
+        "stream": True,
+    }
+    if reasoning_effort:
+        responses_request_kwargs["reasoning"] = {"effort": reasoning_effort}
+
+    try:
+        stream = client.responses.create(**responses_request_kwargs)
+
+        for event in stream:
+            text_delta, reasoning_delta = extract_response_deltas(event)
+
+            if reasoning_delta:
+                thought += reasoning_delta
+                thought_placeholder.markdown(thought)
+
+            if text_delta:
+                answer += text_delta
+                answer_placeholder.markdown(answer)
+
+        if not thought:
+            thought_placeholder.caption("No reasoning/thought stream was returned by this model.")
+
+        return answer, thought
+    except Exception:
+        # Fallback path for providers/endpoints without Responses API support.
+        answer = ""
+        thought = ""
+        thought_placeholder.empty()
+        answer_placeholder.empty()
+        st.caption("Responses API failed on this endpoint/model. Falling back to Chat Completions.")
 
     request_kwargs: dict[str, Any] = {
         "model": model,
@@ -181,21 +277,14 @@ def render() -> None:
         )
         reasoning_effort_input = st.selectbox(
             "Reasoning Effort",
-            options=["default", "minimal", "low", "medium", "high"],
-            index=0,
-            help="For reasoning-capable models/providers. 'default' sends no explicit setting. 'minimal' maps to 'low' for compatibility.",
+            options=["none", "minimal", "low", "medium", "high"],
+            index=2,
+            help="For reasoning-capable models/providers. The selected value is sent as-is.",
         )
 
         effective_base_url = base_url_input.strip() or DEFAULT_BASE_URL
         effective_model = model_input.strip() or DEFAULT_MODEL
-        if reasoning_effort_input == "default":
-            effective_reasoning_effort = None
-        elif reasoning_effort_input == "minimal":
-            # Chat Completions reasoning_effort is typically low/medium/high.
-            # Keep "minimal" as a UX alias for lowest effort while preserving compatibility.
-            effective_reasoning_effort = "low"
-        else:
-            effective_reasoning_effort = reasoning_effort_input
+        effective_reasoning_effort = reasoning_effort_input
 
         st.caption(
             f"Endpoint in use: {'Sidebar override' if base_url_input.strip() else 'config.py default'}"
@@ -235,9 +324,9 @@ def render() -> None:
             key="original_image",
         )
         if original_image is not None:
-            st.image(original_image, caption="Original image preview", use_container_width=True)
+            st.image(original_image, caption="Original image preview", width="stretch")
         additional_context = st.text_area("Additional Context", key="additional_context", height=140)
-        analyze_clicked = st.button("Analyze", type="primary", use_container_width=True)
+        analyze_clicked = st.button("Analyze", type="primary", width="stretch")
 
     with right_col:
         st.subheader("Phase 1 Output")
@@ -305,14 +394,14 @@ def render() -> None:
                 key="correction_image",
             )
             if correction_image is not None:
-                st.image(correction_image, caption="Correction image preview", use_container_width=True)
+                st.image(correction_image, caption="Correction image preview", width="stretch")
             correction_notes = st.text_area(
                 "Correction Notes",
                 key="correction_notes",
                 placeholder="Example: The lighting is too flat and shadows are missing.",
                 height=120,
             )
-            correction_clicked = st.button("Submit Correction", use_container_width=True)
+            correction_clicked = st.button("Submit Correction", width="stretch")
 
         with corr_right:
             st.subheader("Updated Analysis")

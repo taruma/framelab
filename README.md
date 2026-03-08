@@ -21,6 +21,8 @@ The app streams responses live and can display model reasoning/thinking output (
 - Uploaded image previews for both Phase 1 and Phase 2
 - Real-time streaming output in UI
 - Thought/reasoning stream shown in **Thought Process** expander
+- Default request path uses **Responses API** (`client.responses.create`)
+- Automatic fallback to **Chat Completions** if Responses is unsupported/fails
 - Two-phase workflow:
   - Phase 1: Analyze reference image
   - Phase 2: Submit correction image + notes
@@ -86,10 +88,9 @@ uv run run.py
 - **Model Name**:
   - If sidebar is left empty, app uses `DEFAULT_MODEL` from `config.py`
 - **Reasoning Effort**:
-  - Options: `default`, `minimal`, `low`, `medium`, `high`
-  - `default` sends no explicit reasoning effort parameter
-  - `minimal` maps to `low` (compatibility alias for "least thinking")
-  - `low`/`medium`/`high` send `reasoning_effort` for reasoning-capable models/providers
+  - Options: `none`, `minimal`, `low`, `medium`, `high`
+  - Default selected value on app load: `low`
+  - Selected value is sent as-is to request reasoning effort settings
 - **System Prompt Override (optional)**:
   - If empty, app uses default prompt content from `system_prompt.txt`
 
@@ -149,7 +150,12 @@ This conversation is persisted in `st.session_state`:
   - Verify API key and endpoint pair (key must match provider).
 
 - **Model not found / unsupported multimodal input**
-  - Ensure selected model supports image inputs and chat completions at your endpoint.
+  - Ensure selected model supports image inputs at your endpoint.
+  - App now tries Responses API first and falls back to Chat Completions automatically.
+
+- **Responses API compatibility issues**
+  - Some OpenAI-compatible providers/models may not fully support Responses stream events.
+  - App will automatically retry the same request via Chat Completions.
 
 - **Image upload issues**
   - Supported: `png`, `jpg`, `jpeg`, `webp`.
@@ -173,6 +179,8 @@ This conversation is persisted in `st.session_state`:
 - `.env.example` — sample env variable template
 - `pyproject.toml` — minimal dependencies
 - `AGENT.md` — contributor/iteration guide for future changes
+
+
 
 
 

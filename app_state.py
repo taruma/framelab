@@ -10,6 +10,9 @@ PHASE2_OUTPUT = "phase2_output"
 PHASE2_REASONING = "phase2_reasoning"
 PHASE2_USAGE = "phase2_usage"
 PREFER_RESPONSES_API = "prefer_responses_api"
+IS_PROCESSING = "is_processing"
+PENDING_ACTION = "pending_action"
+LAST_ERROR = "last_error"
 
 
 def init_state() -> None:
@@ -23,6 +26,9 @@ def init_state() -> None:
         PHASE2_REASONING: "",
         PHASE2_USAGE: None,
         PREFER_RESPONSES_API: True,
+        IS_PROCESSING: False,
+        PENDING_ACTION: None,
+        LAST_ERROR: "",
     }
     for key, value in defaults.items():
         if key not in st.session_state:

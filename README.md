@@ -2,7 +2,7 @@
 
 FrameLab is a lightweight multimodal AI web app for cinematic image analysis. It accepts a reference image with optional context, streams detailed technical breakdowns (covering composition, lighting, and optics), and supports a correction loop where users can submit a new image with notes to refine the analysis. Built with Python + Streamlit + OpenAI SDK, it displays live streaming output, model reasoning/thinking, and token usage while supporting any OpenAI-compatible endpoint.
 
-> **⚙️ Default Configuration**: Currently uses **BytePlus** endpoint (`https://ark.ap-southeast.bytepluses.com/api/v3`) with **seed-2-0-lite** model. Modify `config.py` or use the sidebar to change to your preferred provider and model.
+> **⚙️ Default Configuration**: Provider presets now live in `config.toml` (BytePlus, OpenAI, Gemini, OpenRouter). Update that file to add/edit endpoints and models.
 
 ---
 
@@ -10,15 +10,15 @@ FrameLab is a lightweight multimodal AI web app for cinematic image analysis. It
 
 - Minimal dependencies: only `streamlit` and `openai`
 - OpenAI-compatible endpoint support via configurable **Base URL**
-- Hybrid configuration fallback:
-  - Sidebar input (if provided)
-  - Otherwise defaults from `config.py`
-- API key support from `.env` with sidebar override priority
+- Provider/model/endpoint presets from `config.toml`
+- Sidebar override support for endpoint/model
+- API key resolution order: sidebar → provider env key → `LLM_API_KEY` → legacy fallback
 - Externalized default system prompt via `system_prompt.txt`
 - Uploaded image previews for both Phase 1 and Phase 2
 - Real-time streaming output in UI
 - Thought/reasoning stream shown in **Thought Process** expander
 - One-click copy buttons for Phase 1 and Phase 2 results (copied as plain text)
+- Per-phase **Request Transparency** expander (collapsed by default) showing request metadata and compact payload preview
 - Token usage summary (input/output/total) shown after successful responses when provider returns usage
 - Default request path uses **Responses API** (`client.responses.create`)
 - Automatic fallback to **Chat Completions** if Responses is unsupported/fails
@@ -59,7 +59,7 @@ copy .env.example .env
 Then set your API key:
 
 ```env
-OPENAI_API_KEY=your_real_key
+LLM_API_KEY=your_real_key
 ```
 
 ### B) From scratch (new folder)
@@ -81,14 +81,18 @@ uv run run.py
 
 ### 1) Configure model (sidebar)
 
+- **Provider**:
+  - Select from presets loaded from `config.toml` (BytePlus/OpenAI/Gemini/OpenRouter)
 - **API Key**:
   - Sidebar input has highest priority
-  - If left empty, app uses `OPENAI_API_KEY` from `.env`
+  - If empty, app uses provider-specific env key from `config.toml`
+  - Fallback to `LLM_API_KEY` (and legacy fallbacks for compatibility)
 - **Base URL / Endpoint**:
-  - If sidebar is left empty, app uses `DEFAULT_BASE_URL` from `config.py`
-  - You can override for OpenAI-compatible providers (local, OpenRouter, Groq, etc.)
-- **Model Name**:
-  - If sidebar is left empty, app uses `DEFAULT_MODEL` from `config.py`
+  - Pre-filled from selected provider preset
+  - Can still be manually overridden
+- **Model**:
+  - Select from provider model list
+  - Optional manual model override is available
 - **Reasoning Effort**:
   - Options: `none`, `minimal`, `low`, `medium`, `high`
   - Default selected value on app load: `low`
@@ -109,6 +113,13 @@ Right panel shows:
 - Usage summary (`input`, `output`, `total` tokens) when provided by the endpoint/model
 - A **Copy Output (plain text)** button for one-click copying without markdown formatting
 
+Above the Phase 1 section, the app also shows a **🔎 Request Transparency** expander (collapsed by default):
+- `⚙️ Request`: provider, endpoint, model, reasoning effort
+- `📦 Payload`: compact one-line preview with distinct color segments (`system`, `image`, `context`), text truncated to 30 words
+- Live-updates as inputs change, so users can verify what will be sent before clicking **Analyze**
+
+The transparency panel now uses thinner text styling and richer visual emphasis (color + bold/italic/underline accents). Metadata fields are color-separated for quick scanning.
+
 ### 3) Phase 2 — Correction Loop
 
 Appears only after Phase 1 completes.
@@ -121,6 +132,10 @@ Appears only after Phase 1 completes.
 Model receives prior context and returns an updated analysis.
 
 Right panel also provides a **Copy Updated Analysis (plain text)** button for one-click copying of the latest corrected output.
+
+After the horizontal divider (before Phase 2 columns), the app shows the same **🔎 Request Transparency** expander for Phase 2, with payload preview sections for system prompt, original image token, prior assistant output, correction image token, and correction notes. This preview also live-updates from current Phase 2 inputs.
+
+Each transparency block uses the native expander toggle only (cleaner UI, no extra control buttons).
 
 ---
 
@@ -182,7 +197,7 @@ This conversation is persisted in `st.session_state`:
 
 ## Security Notes
 
-- API keys can be loaded from `.env` (`OPENAI_API_KEY`) or entered in the sidebar.
+- API keys can be loaded from `.env` (`LLM_API_KEY` and/or provider-specific keys) or entered in the sidebar.
 - Sidebar API key input overrides `.env` when both are present.
 - Avoid sharing screenshots/logs containing secrets.
 - For production deployment, use secret management (env vars / platform secret store).
@@ -195,11 +210,18 @@ This conversation is persisted in `st.session_state`:
 - `app_state.py` — session-state keys and initialization
 - `conversation.py` — multimodal message construction/conversion helpers
 - `llm_streaming.py` — streaming transport/delta parsing/fallback flow
-- `config.py` — default endpoint/model configuration
+- `config.toml` — provider presets and default endpoint/model configuration
 - `system_prompt.txt` — default system prompt content
 - `.env.example` — sample env variable template
 - `pyproject.toml` — minimal dependencies
 - `AGENTS.md` — contributor/iteration guide for future changes
+
+
+
+
+
+
+
 
 
 

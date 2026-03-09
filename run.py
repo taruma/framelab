@@ -2,6 +2,7 @@ import os
 import re
 import json
 import sys
+import tomllib
 import html as html_lib
 from typing import Tuple
 
@@ -11,6 +12,9 @@ from openai import OpenAI
 
 from app_state import (
     CONVERSATION_MESSAGES,
+    IS_PROCESSING,
+    LAST_ERROR,
+    PENDING_ACTION,
     PHASE1_DONE,
     PHASE1_OUTPUT,
     PHASE1_REASONING,
@@ -22,8 +26,18 @@ from app_state import (
     init_state,
 )
 from conversation import make_user_message
-from config import DEFAULT_BASE_URL, DEFAULT_MODEL
 from llm_streaming import stream_response
+
+
+DEFAULT_APP_CONFIG = {
+    "defaults": {
+        "provider": "",
+        "reasoning_effort": "low",
+    },
+    "providers": {},
+}
+
+TRANSPARENCY_PREVIEW_WORDS = 30
 
 
 def render_usage(usage: dict | None, placeholder: st.delta_generator.DeltaGenerator) -> None:
@@ -44,6 +58,116 @@ def render_usage(usage: dict | None, placeholder: st.delta_generator.DeltaGenera
         parts.append(f"total: {total_tokens}")
 
     placeholder.caption(" · ".join(parts))
+
+
+def one_line(text: str) -> str:
+    return re.sub(r"\s+", " ", (text or "").strip())
+
+
+def truncate_words(text: str, limit: int = TRANSPARENCY_PREVIEW_WORDS) -> str:
+    compact = one_line(text)
+    if not compact:
+        return ""
+    words = compact.split(" ")
+    if len(words) <= limit:
+        return compact
+    return " ".join(words[:limit]) + " ..."
+
+
+def transparency_chip(label: str, color: str, content: str) -> str:
+    safe_content = html_lib.escape(content)
+    safe_label = html_lib.escape(label)
+    return (
+        f"<span style='color:{color};font-weight:600'>[{safe_label}: {safe_content}]</span>"
+        if content
+        else f"<span style='color:{color};font-weight:600'>[{safe_label}]</span>"
+    )
+
+
+def render_transparency_block(
+    metadata: dict[str, str],
+    payload_chips: list[str],
+    *,
+    key: str,
+    expanded: bool = True,
+) -> None:
+    with st.expander("🔎 Request Transparency", expanded=expanded):
+        metadata_line = (
+            "<div style='font-size:0.86rem;line-height:1.35;'>"
+            "⚙️ "
+            f"<span style='color:#60a5fa;'><b>{html_lib.escape(metadata.get('provider', '-'))}</b></span>"
+            " · "
+            f"<span style='color:#f59e0b;'><i>{html_lib.escape(metadata.get('endpoint', '-'))}</i></span>"
+            " · "
+            f"<span style='color:#34d399;'><b>{html_lib.escape(metadata.get('model', '-'))}</b></span>"
+            " · "
+            f"<span style='color:#a78bfa;'><u>{html_lib.escape(metadata.get('reasoning', '-'))}</u></span>"
+            "</div>"
+        )
+        payload_line = (
+            "<div style='font-size:0.86rem;line-height:1.45;'>"
+            "📦 " + " + ".join(payload_chips) +
+            "</div>"
+        )
+        st.markdown(metadata_line, unsafe_allow_html=True)
+        st.markdown(payload_line, unsafe_allow_html=True)
+
+
+def build_phase1_transparency_preview(
+    provider_label: str,
+    endpoint: str,
+    model: str,
+    reasoning: str,
+    system_prompt: str,
+    additional_context: str,
+    has_reference_image: bool,
+) -> tuple[dict[str, str], list[str]]:
+    initial_user_text = (
+        "Analyze this reference image in highly detailed technical and creative terms.\n\n"
+        f"Additional Context:\n{additional_context.strip() or 'None provided.'}"
+    )
+    meta = {
+        "provider": provider_label or "-",
+        "endpoint": endpoint or "-",
+        "model": model or "-",
+        "reasoning": reasoning or "-",
+    }
+    payload = [
+        transparency_chip("system", "#60a5fa", truncate_words(system_prompt)),
+        transparency_chip("reference image", "#f59e0b", "image" if has_reference_image else "not selected"),
+        transparency_chip("prompt/context", "#34d399", truncate_words(initial_user_text)),
+    ]
+    return meta, payload
+
+
+def build_phase2_transparency_preview(
+    provider_label: str,
+    endpoint: str,
+    model: str,
+    reasoning: str,
+    system_prompt: str,
+    phase1_output: str,
+    correction_notes: str,
+    has_correction_image: bool,
+) -> tuple[dict[str, str], list[str]]:
+    correction_text = (
+        "Use this new image and correction notes to refine your previous analysis.\n\n"
+        f"Correction Notes:\n{correction_notes.strip() or 'None provided.'}"
+    )
+    meta = {
+        "provider": provider_label or "-",
+        "endpoint": endpoint or "-",
+        "model": model or "-",
+        "reasoning": reasoning or "-",
+    }
+    payload = [
+        transparency_chip("system", "#60a5fa", truncate_words(system_prompt)),
+        transparency_chip("reference image", "#f59e0b", "image"),
+        transparency_chip("previous output", "#a78bfa", truncate_words(phase1_output)),
+        transparency_chip("correction image", "#f59e0b", "image" if has_correction_image else "not selected"),
+        transparency_chip("correction notes", "#34d399", truncate_words(correction_text)),
+    ]
+    return meta, payload
 
 
 def load_env_file(path: str = ".env") -> None:
@@ -75,6 +199,53 @@ def load_system_prompt(path: str = "system_prompt.txt") -> Tuple[str, str]:
         return "", f"System prompt file not found: {path}"
     except OSError as exc:
         return "", f"Failed to read system prompt file ({path}): {exc}"
+
+
+def load_hero(path: str = "hero.md") -> Tuple[str, str]:
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read().strip(), ""
+    except FileNotFoundError:
+        return "", f"Hero file not found: {path}"
+    except OSError as exc:
+        return "", f"Failed to read hero file ({path}): {exc}"
+
+
+def load_app_config(path: str = "config.toml") -> tuple[dict, str]:
+    try:
+        with open(path, "rb") as f:
+            loaded = tomllib.load(f)
+        return loaded, ""
+    except FileNotFoundError:
+        return DEFAULT_APP_CONFIG, f"Config file not found: {path}. Using built-in defaults."
+    except tomllib.TOMLDecodeError as exc:
+        return DEFAULT_APP_CONFIG, f"Invalid TOML in {path}: {exc}. Using built-in defaults."
+    except OSError as exc:
+        return DEFAULT_APP_CONFIG, f"Failed to read config file ({path}): {exc}. Using built-in defaults."
+
+
+def resolve_api_key(sidebar_key: str, provider_env_key: str) -> tuple[str, str]:
+    typed_key = sidebar_key.strip()
+    if typed_key:
+        return typed_key, "sidebar input"
+
+    provider_key = os.environ.get(provider_env_key, "").strip() if provider_env_key else ""
+    if provider_key:
+        return provider_key, f".env (`{provider_env_key}`)"
+
+    generic_key = os.environ.get("LLM_API_KEY", "").strip()
+    if generic_key:
+        return generic_key, ".env (`LLM_API_KEY`)"
+
+    legacy_key = os.environ.get("API_KEY", "").strip()
+    if legacy_key:
+        return legacy_key, ".env (`API_KEY`)"
+
+    openai_legacy_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if openai_legacy_key:
+        return openai_legacy_key, ".env (`OPENAI_API_KEY`, legacy)"
+
+    return "", "not found"
 
 
 def markdown_to_plain_text(text: str) -> str:
@@ -129,64 +300,114 @@ def render_copy_button(label: str, text: str, key: str) -> None:
 
 
 def render() -> None:
-    st.set_page_config(page_title="Multimodal Analysis + Correction", layout="wide")
+    st.set_page_config(page_title="FrameLab - Multimodal Analysis", layout="wide")
     init_state()
     load_env_file()
+    app_config, config_error = load_app_config()
 
     file_prompt, prompt_error = load_system_prompt()
+    hero_content, hero_error = load_hero()
 
-    st.title("🧠 Multimodal Image Analysis")
-    st.caption("Analyze a reference image, then iterate with correction images and notes.")
+    # Hero Section
+    if hero_content:
+        st.markdown(hero_content, unsafe_allow_html=True)
+    elif hero_error:
+        st.warning(hero_error)
+    st.divider()
+
+    providers = app_config.get("providers", {})
+    defaults = app_config.get("defaults", {})
+    provider_ids = list(providers.keys())
+    default_provider_id = defaults.get("provider", provider_ids[0] if provider_ids else "")
+    if default_provider_id not in providers and provider_ids:
+        default_provider_id = provider_ids[0]
 
     with st.sidebar:
-        st.header("Model Settings")
-        api_key_input = st.text_input("API Key", type="password")
-        env_api_key = os.environ.get("OPENAI_API_KEY", "").strip()
-        effective_api_key = api_key_input.strip() or env_api_key
-        if api_key_input.strip():
-            st.caption("Using API key from sidebar input.")
-        elif env_api_key:
-            st.caption("Using API key from .env (`OPENAI_API_KEY`).")
-        else:
-            st.caption("No API key found yet. Enter one in sidebar or set `OPENAI_API_KEY` in .env.")
+        st.header("Settings")
 
-        base_url_input = st.text_input(
-            "Base URL / Endpoint",
-            value="",
-            placeholder=f"Leave empty to use default: {DEFAULT_BASE_URL}",
-        )
-        model_input = st.text_input(
-            "Model Name",
-            value="",
-            placeholder=f"Leave empty to use default: {DEFAULT_MODEL}",
-        )
-        reasoning_effort_input = st.selectbox(
-            "Reasoning Effort",
-            options=["none", "minimal", "low", "medium", "high"],
-            index=2,
-            help="For reasoning-capable models/providers. The selected value is sent as-is.",
-        )
+        ui_locked = st.session_state[IS_PROCESSING]
 
-        effective_base_url = base_url_input.strip() or DEFAULT_BASE_URL
-        effective_model = model_input.strip() or DEFAULT_MODEL
-        effective_reasoning_effort = reasoning_effort_input
+        if config_error:
+            st.warning(config_error)
 
-        st.caption(
-            f"Endpoint in use: {'Sidebar override' if base_url_input.strip() else 'config.py default'}"
-        )
-        st.caption(
-            f"Model in use: {'Sidebar override' if model_input.strip() else 'config.py default'}"
-        )
-        st.caption(
-            "Reasoning effort in use: "
-            f"{reasoning_effort_input}"
-        )
+        with st.expander("API Setup", expanded=True):
+            if not provider_ids:
+                st.error("No providers found in config.toml. Please add at least one provider.")
+                return
+
+            default_provider_index = provider_ids.index(default_provider_id)
+            selected_provider_id = st.selectbox(
+                "Provider",
+                options=provider_ids,
+                index=default_provider_index,
+                format_func=lambda pid: providers.get(pid, {}).get("label", pid),
+                disabled=ui_locked,
+            )
+            selected_provider = providers.get(selected_provider_id, {})
+            selected_provider_label = selected_provider.get("label", selected_provider_id)
+
+            provider_default_base_url = str(selected_provider.get("base_url", "")).strip()
+            provider_default_model = str(selected_provider.get("default_model", "")).strip()
+            provider_env_key = str(selected_provider.get("env_key", "")).strip()
+            provider_models = selected_provider.get("models", []) or []
+            provider_models = [str(m).strip() for m in provider_models if str(m).strip()]
+            if provider_default_model and provider_default_model not in provider_models:
+                provider_models.insert(0, provider_default_model)
+            model_default_index = (
+                provider_models.index(provider_default_model)
+                if provider_default_model and provider_default_model in provider_models
+                else 0
+            )
+
+            api_key_input = st.text_input("API Key", type="password", disabled=ui_locked)
+            effective_api_key, api_key_source = resolve_api_key(api_key_input, provider_env_key)
+            if effective_api_key:
+                st.caption(f"API key source: {api_key_source}")
+            else:
+                st.caption(
+                    "No API key found. Use sidebar input or set one of: "
+                    f"`{provider_env_key}` / `LLM_API_KEY` / `API_KEY` / `OPENAI_API_KEY`."
+                )
+
+            base_url_input = st.text_input(
+                "Base URL / Endpoint",
+                value=provider_default_base_url,
+                disabled=ui_locked,
+            )
+            model_from_list = st.selectbox(
+                "Model",
+                options=provider_models or [provider_default_model],
+                index=model_default_index,
+                disabled=ui_locked,
+            )
+            model_input = st.text_input("Model Override (optional)", value="", disabled=ui_locked)
+            reasoning_effort_input = st.selectbox(
+                "Reasoning Effort",
+                options=["none", "minimal", "low", "medium", "high"],
+                index=["none", "minimal", "low", "medium", "high"].index(
+                    defaults.get("reasoning_effort", "low")
+                    if defaults.get("reasoning_effort", "low") in ["none", "minimal", "low", "medium", "high"]
+                    else "low"
+                ),
+                help="For reasoning-capable models/providers. The selected value is sent as-is.",
+                disabled=ui_locked,
+            )
+
+            effective_base_url = base_url_input.strip() or provider_default_base_url
+            effective_model = model_input.strip() or model_from_list or provider_default_model
+            effective_reasoning_effort = reasoning_effort_input
+
+            st.caption(f"Reasoning effort: {reasoning_effort_input}")
+
+        st.divider()
+        st.markdown("#### System Prompt")
 
         system_prompt_override = st.text_area(
             "System Prompt Override (optional)",
             value="",
             placeholder="Leave empty to use system_prompt.txt",
             height=180,
+            disabled=ui_locked,
         )
         effective_system_prompt = system_prompt_override.strip() or file_prompt
 
@@ -207,11 +428,33 @@ def render() -> None:
             "Original Reference Image",
             type=["png", "jpg", "jpeg", "webp"],
             key="original_image",
+            disabled=ui_locked,
         )
         if original_image is not None:
             st.image(original_image, caption="Original image preview", width="stretch")
-        additional_context = st.text_area("Additional Context", key="additional_context", height=140)
-        analyze_clicked = st.button("Analyze", type="primary", width="stretch")
+        additional_context = st.text_area(
+            "Additional Context",
+            key="additional_context",
+            height=140,
+            disabled=ui_locked,
+        )
+
+        phase1_meta_preview, phase1_payload_preview = build_phase1_transparency_preview(
+            provider_label=str(selected_provider_label),
+            endpoint=effective_base_url,
+            model=effective_model,
+            reasoning=effective_reasoning_effort,
+            system_prompt=effective_system_prompt,
+            additional_context=additional_context,
+            has_reference_image=original_image is not None,
+        )
+        render_transparency_block(
+            phase1_meta_preview,
+            phase1_payload_preview,
+            key="phase1_transparency_preview",
+        )
+
+        analyze_clicked = st.button("Analyze", type="primary", width="stretch", disabled=ui_locked)
 
     with right_col:
         st.subheader("Phase 1 Output")
@@ -233,9 +476,9 @@ def render() -> None:
                     key="phase1_copy_button",
                 )
 
-    if analyze_clicked:
+    if analyze_clicked and not ui_locked:
         if not effective_api_key:
-            st.error("Please provide an API key in the sidebar or set OPENAI_API_KEY in .env.")
+            st.error("Please provide an API key in sidebar or set provider key / LLM_API_KEY / API_KEY in .env.")
             return
         if not effective_model:
             st.error("Please provide a model name.")
@@ -244,6 +487,12 @@ def render() -> None:
             st.error("Please upload an original reference image.")
             return
 
+        st.session_state[LAST_ERROR] = ""
+        st.session_state[IS_PROCESSING] = True
+        st.session_state[PENDING_ACTION] = "phase1"
+        st.rerun()
+
+    if st.session_state[PENDING_ACTION] == "phase1":
         client = OpenAI(api_key=effective_api_key, base_url=effective_base_url)
         messages = []
         if effective_system_prompt.strip():
@@ -253,35 +502,43 @@ def render() -> None:
             "Analyze this reference image in highly detailed technical and creative terms.\n\n"
             f"Additional Context:\n{additional_context.strip() or 'None provided.'}"
         )
+
         initial_user_message = make_user_message(original_image, initial_user_text)
         messages.append(initial_user_message)
 
-        with st.spinner("Analyzing image..."):
-            answer, thought, usage, prefer_responses_api = stream_response(
-                client,
-                effective_model,
-                messages,
-                phase1_thought_placeholder,
-                phase1_answer_placeholder,
-                reasoning_effort=effective_reasoning_effort,
-                prefer_responses_api=st.session_state[PREFER_RESPONSES_API],
-            )
-        st.session_state[PREFER_RESPONSES_API] = prefer_responses_api
-        render_usage(usage, phase1_usage_placeholder)
-        with phase1_copy_placeholder.container():
-            render_copy_button("Copy Output (plain text)", answer, key="phase1_copy_button")
+        try:
+            with st.spinner("Analyzing image..."):
+                answer, thought, usage, prefer_responses_api = stream_response(
+                    client,
+                    effective_model,
+                    messages,
+                    phase1_thought_placeholder,
+                    phase1_answer_placeholder,
+                    reasoning_effort=effective_reasoning_effort,
+                    prefer_responses_api=st.session_state[PREFER_RESPONSES_API],
+                )
+            st.session_state[PREFER_RESPONSES_API] = prefer_responses_api
+            render_usage(usage, phase1_usage_placeholder)
+            with phase1_copy_placeholder.container():
+                render_copy_button("Copy Output (plain text)", answer, key="phase1_copy_button")
 
-        st.session_state[PHASE1_DONE] = True
-        st.session_state[PHASE1_OUTPUT] = answer
-        st.session_state[PHASE1_REASONING] = thought
-        st.session_state[PHASE1_USAGE] = usage
-        st.session_state[PHASE2_OUTPUT] = ""
-        st.session_state[PHASE2_REASONING] = ""
-        st.session_state[PHASE2_USAGE] = None
+            st.session_state[PHASE1_DONE] = True
+            st.session_state[PHASE1_OUTPUT] = answer
+            st.session_state[PHASE1_REASONING] = thought
+            st.session_state[PHASE1_USAGE] = usage
+            st.session_state[PHASE2_OUTPUT] = ""
+            st.session_state[PHASE2_REASONING] = ""
+            st.session_state[PHASE2_USAGE] = None
 
-        st.session_state[CONVERSATION_MESSAGES] = messages + [
-            {"role": "assistant", "content": answer}
-        ]
+            st.session_state[CONVERSATION_MESSAGES] = messages + [
+                {"role": "assistant", "content": answer}
+            ]
+        except Exception as exc:
+            st.session_state[LAST_ERROR] = f"Analyze failed: {exc}"
+        finally:
+            st.session_state[PENDING_ACTION] = None
+            st.session_state[IS_PROCESSING] = False
+            st.rerun()
 
     if st.session_state[PHASE1_DONE]:
         st.divider()
@@ -293,6 +550,7 @@ def render() -> None:
                 "Upload the generated/incorrect image",
                 type=["png", "jpg", "jpeg", "webp"],
                 key="correction_image",
+                disabled=ui_locked,
             )
             if correction_image is not None:
                 st.image(correction_image, caption="Correction image preview", width="stretch")
@@ -301,8 +559,26 @@ def render() -> None:
                 key="correction_notes",
                 placeholder="Example: The lighting is too flat and shadows are missing.",
                 height=120,
+                disabled=ui_locked,
             )
-            correction_clicked = st.button("Submit Correction", width="stretch")
+
+            phase2_meta_preview, phase2_payload_preview = build_phase2_transparency_preview(
+                provider_label=str(selected_provider_label),
+                endpoint=effective_base_url,
+                model=effective_model,
+                reasoning=effective_reasoning_effort,
+                system_prompt=effective_system_prompt,
+                phase1_output=st.session_state[PHASE1_OUTPUT],
+                correction_notes=correction_notes,
+                has_correction_image=correction_image is not None,
+            )
+            render_transparency_block(
+                phase2_meta_preview,
+                phase2_payload_preview,
+                key="phase2_transparency_preview",
+            )
+
+            correction_clicked = st.button("Submit Correction", width="stretch", disabled=ui_locked)
 
         with corr_right:
             st.subheader("Updated Analysis")
@@ -324,9 +600,9 @@ def render() -> None:
                         key="phase2_copy_button",
                     )
 
-        if correction_clicked:
+        if correction_clicked and not ui_locked:
             if not effective_api_key:
-                st.error("Please provide an API key in the sidebar or set OPENAI_API_KEY in .env.")
+                st.error("Please provide an API key in sidebar or set provider key / LLM_API_KEY / API_KEY in .env.")
                 return
             if not effective_model:
                 st.error("Please provide a model name.")
@@ -335,41 +611,58 @@ def render() -> None:
                 st.error("Please upload a correction image.")
                 return
 
+            st.session_state[LAST_ERROR] = ""
+            st.session_state[IS_PROCESSING] = True
+            st.session_state[PENDING_ACTION] = "phase2"
+            st.rerun()
+
+        if st.session_state[PENDING_ACTION] == "phase2":
             client = OpenAI(api_key=effective_api_key, base_url=effective_base_url)
 
             correction_text = (
                 "Use this new image and correction notes to refine your previous analysis.\n\n"
                 f"Correction Notes:\n{correction_notes.strip() or 'None provided.'}"
             )
+
             correction_user_message = make_user_message(correction_image, correction_text)
 
             messages = list(st.session_state[CONVERSATION_MESSAGES])
             messages.append(correction_user_message)
 
-            with st.spinner("Applying correction..."):
-                answer, thought, usage, prefer_responses_api = stream_response(
-                    client,
-                    effective_model,
-                    messages,
-                    phase2_thought_placeholder,
-                    phase2_answer_placeholder,
-                    reasoning_effort=effective_reasoning_effort,
-                    prefer_responses_api=st.session_state[PREFER_RESPONSES_API],
-                )
-            st.session_state[PREFER_RESPONSES_API] = prefer_responses_api
-            render_usage(usage, phase2_usage_placeholder)
-            with phase2_copy_placeholder.container():
-                render_copy_button(
-                    "Copy Updated Analysis (plain text)",
-                    answer,
-                    key="phase2_copy_button",
-                )
+            try:
+                with st.spinner("Applying correction..."):
+                    answer, thought, usage, prefer_responses_api = stream_response(
+                        client,
+                        effective_model,
+                        messages,
+                        phase2_thought_placeholder,
+                        phase2_answer_placeholder,
+                        reasoning_effort=effective_reasoning_effort,
+                        prefer_responses_api=st.session_state[PREFER_RESPONSES_API],
+                    )
+                st.session_state[PREFER_RESPONSES_API] = prefer_responses_api
+                render_usage(usage, phase2_usage_placeholder)
+                with phase2_copy_placeholder.container():
+                    render_copy_button(
+                        "Copy Updated Analysis (plain text)",
+                        answer,
+                        key="phase2_copy_button",
+                    )
 
-            messages.append({"role": "assistant", "content": answer})
-            st.session_state[CONVERSATION_MESSAGES] = messages
-            st.session_state[PHASE2_OUTPUT] = answer
-            st.session_state[PHASE2_REASONING] = thought
-            st.session_state[PHASE2_USAGE] = usage
+                messages.append({"role": "assistant", "content": answer})
+                st.session_state[CONVERSATION_MESSAGES] = messages
+                st.session_state[PHASE2_OUTPUT] = answer
+                st.session_state[PHASE2_REASONING] = thought
+                st.session_state[PHASE2_USAGE] = usage
+            except Exception as exc:
+                st.session_state[LAST_ERROR] = f"Correction failed: {exc}"
+            finally:
+                st.session_state[PENDING_ACTION] = None
+                st.session_state[IS_PROCESSING] = False
+                st.rerun()
+
+    if st.session_state[LAST_ERROR]:
+        st.error(st.session_state[LAST_ERROR])
 
 
 if __name__ == "__main__":

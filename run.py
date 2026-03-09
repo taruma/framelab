@@ -86,6 +86,16 @@ def load_system_prompt(path: str = "system_prompt.txt") -> Tuple[str, str]:
         return "", f"Failed to read system prompt file ({path}): {exc}"
 
 
+def load_hero(path: str = "hero.md") -> Tuple[str, str]:
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read().strip(), ""
+    except FileNotFoundError:
+        return "", f"Hero file not found: {path}"
+    except OSError as exc:
+        return "", f"Failed to read hero file ({path}): {exc}"
+
+
 def load_app_config(path: str = "config.toml") -> tuple[dict, str]:
     try:
         with open(path, "rb") as f:
@@ -175,15 +185,20 @@ def render_copy_button(label: str, text: str, key: str) -> None:
 
 
 def render() -> None:
-    st.set_page_config(page_title="Multimodal Analysis + Correction", layout="wide")
+    st.set_page_config(page_title="FrameLab - Multimodal Analysis", layout="wide")
     init_state()
     load_env_file()
     app_config, config_error = load_app_config()
 
     file_prompt, prompt_error = load_system_prompt()
+    hero_content, hero_error = load_hero()
 
-    st.title("🧠 Multimodal Image Analysis")
-    st.caption("Analyze a reference image, then iterate with correction images and notes.")
+    # Hero Section
+    if hero_content:
+        st.markdown(hero_content, unsafe_allow_html=True)
+    elif hero_error:
+        st.warning(hero_error)
+    st.divider()
 
     providers = app_config.get("providers", {})
     defaults = app_config.get("defaults", {})

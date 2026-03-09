@@ -34,6 +34,8 @@ DEFAULT_APP_CONFIG = {
     "providers": {},
 }
 
+TRANSPARENCY_PREVIEW_WORDS = 30
+
 
 def render_usage(usage: dict | None, placeholder: st.delta_generator.DeltaGenerator) -> None:
     if not usage:
@@ -53,6 +55,116 @@ def render_usage(usage: dict | None, placeholder: st.delta_generator.DeltaGenera
         parts.append(f"total: {total_tokens}")
 
     placeholder.caption(" · ".join(parts))
+
+
+def one_line(text: str) -> str:
+    return re.sub(r"\s+", " ", (text or "").strip())
+
+
+def truncate_words(text: str, limit: int = TRANSPARENCY_PREVIEW_WORDS) -> str:
+    compact = one_line(text)
+    if not compact:
+        return ""
+    words = compact.split(" ")
+    if len(words) <= limit:
+        return compact
+    return " ".join(words[:limit]) + " ..."
+
+
+def transparency_chip(label: str, color: str, content: str) -> str:
+    safe_content = html_lib.escape(content)
+    safe_label = html_lib.escape(label)
+    return (
+        f"<span style='color:{color};font-weight:600'>[{safe_label}: {safe_content}]</span>"
+        if content
+        else f"<span style='color:{color};font-weight:600'>[{safe_label}]</span>"
+    )
+
+
+def render_transparency_block(
+    metadata: dict[str, str],
+    payload_chips: list[str],
+    *,
+    key: str,
+    expanded: bool = True,
+) -> None:
+    with st.expander("🔎 Request Transparency", expanded=expanded):
+        metadata_line = (
+            "<div style='font-size:0.86rem;line-height:1.35;'>"
+            "⚙️ "
+            f"<span style='color:#60a5fa;'><b>{html_lib.escape(metadata.get('provider', '-'))}</b></span>"
+            " · "
+            f"<span style='color:#f59e0b;'><i>{html_lib.escape(metadata.get('endpoint', '-'))}</i></span>"
+            " · "
+            f"<span style='color:#34d399;'><b>{html_lib.escape(metadata.get('model', '-'))}</b></span>"
+            " · "
+            f"<span style='color:#a78bfa;'><u>{html_lib.escape(metadata.get('reasoning', '-'))}</u></span>"
+            "</div>"
+        )
+        payload_line = (
+            "<div style='font-size:0.86rem;line-height:1.45;'>"
+            "📦 " + " + ".join(payload_chips) +
+            "</div>"
+        )
+        st.markdown(metadata_line, unsafe_allow_html=True)
+        st.markdown(payload_line, unsafe_allow_html=True)
+
+
+def build_phase1_transparency_preview(
+    provider_label: str,
+    endpoint: str,
+    model: str,
+    reasoning: str,
+    system_prompt: str,
+    additional_context: str,
+    has_reference_image: bool,
+) -> tuple[dict[str, str], list[str]]:
+    initial_user_text = (
+        "Analyze this reference image in highly detailed technical and creative terms.\n\n"
+        f"Additional Context:\n{additional_context.strip() or 'None provided.'}"
+    )
+    meta = {
+        "provider": provider_label or "-",
+        "endpoint": endpoint or "-",
+        "model": model or "-",
+        "reasoning": reasoning or "-",
+    }
+    payload = [
+        transparency_chip("system", "#60a5fa", truncate_words(system_prompt)),
+        transparency_chip("reference image", "#f59e0b", "image" if has_reference_image else "not selected"),
+        transparency_chip("prompt/context", "#34d399", truncate_words(initial_user_text)),
+    ]
+    return meta, payload
+
+
+def build_phase2_transparency_preview(
+    provider_label: str,
+    endpoint: str,
+    model: str,
+    reasoning: str,
+    system_prompt: str,
+    phase1_output: str,
+    correction_notes: str,
+    has_correction_image: bool,
+) -> tuple[dict[str, str], list[str]]:
+    correction_text = (
+        "Use this new image and correction notes to refine your previous analysis.\n\n"
+        f"Correction Notes:\n{correction_notes.strip() or 'None provided.'}"
+    )
+    meta = {
+        "provider": provider_label or "-",
+        "endpoint": endpoint or "-",
+        "model": model or "-",
+        "reasoning": reasoning or "-",
+    }
+    payload = [
+        transparency_chip("system", "#60a5fa", truncate_words(system_prompt)),
+        transparency_chip("reference image", "#f59e0b", "image"),
+        transparency_chip("previous output", "#a78bfa", truncate_words(phase1_output)),
+        transparency_chip("correction image", "#f59e0b", "image" if has_correction_image else "not selected"),
+        transparency_chip("correction notes", "#34d399", truncate_words(correction_text)),
+    ]
+    return meta, payload
 
 
 def load_env_file(path: str = ".env") -> None:
@@ -226,6 +338,7 @@ def render() -> None:
                 format_func=lambda pid: providers.get(pid, {}).get("label", pid),
             )
             selected_provider = providers.get(selected_provider_id, {})
+            selected_provider_label = selected_provider.get("label", selected_provider_id)
 
             provider_default_base_url = str(selected_provider.get("base_url", "")).strip()
             provider_default_model = str(selected_provider.get("default_model", "")).strip()
@@ -297,6 +410,8 @@ def render() -> None:
             f"System prompt in use: {'Sidebar override' if system_prompt_override.strip() else 'system_prompt.txt'}"
         )
 
+    phase1_transparency_placeholder = st.empty()
+
     left_col, right_col = st.columns([1, 1.2], gap="large")
 
     with left_col:
@@ -310,6 +425,22 @@ def render() -> None:
             st.image(original_image, caption="Original image preview", width="stretch")
         additional_context = st.text_area("Additional Context", key="additional_context", height=140)
         analyze_clicked = st.button("Analyze", type="primary", width="stretch")
+
+    phase1_meta_preview, phase1_payload_preview = build_phase1_transparency_preview(
+        provider_label=str(selected_provider_label),
+        endpoint=effective_base_url,
+        model=effective_model,
+        reasoning=effective_reasoning_effort,
+        system_prompt=effective_system_prompt,
+        additional_context=additional_context,
+        has_reference_image=original_image is not None,
+    )
+    with phase1_transparency_placeholder.container():
+        render_transparency_block(
+            phase1_meta_preview,
+            phase1_payload_preview,
+            key="phase1_transparency_preview",
+        )
 
     with right_col:
         st.subheader("Phase 1 Output")
@@ -351,6 +482,7 @@ def render() -> None:
             "Analyze this reference image in highly detailed technical and creative terms.\n\n"
             f"Additional Context:\n{additional_context.strip() or 'None provided.'}"
         )
+
         initial_user_message = make_user_message(original_image, initial_user_text)
         messages.append(initial_user_message)
 
@@ -383,6 +515,7 @@ def render() -> None:
 
     if st.session_state[PHASE1_DONE]:
         st.divider()
+        phase2_transparency_placeholder = st.empty()
         corr_left, corr_right = st.columns([1, 1.2], gap="large")
 
         with corr_left:
@@ -401,6 +534,23 @@ def render() -> None:
                 height=120,
             )
             correction_clicked = st.button("Submit Correction", width="stretch")
+
+        phase2_meta_preview, phase2_payload_preview = build_phase2_transparency_preview(
+            provider_label=str(selected_provider_label),
+            endpoint=effective_base_url,
+            model=effective_model,
+            reasoning=effective_reasoning_effort,
+            system_prompt=effective_system_prompt,
+            phase1_output=st.session_state[PHASE1_OUTPUT],
+            correction_notes=correction_notes,
+            has_correction_image=correction_image is not None,
+        )
+        with phase2_transparency_placeholder.container():
+            render_transparency_block(
+                phase2_meta_preview,
+                phase2_payload_preview,
+                key="phase2_transparency_preview",
+            )
 
         with corr_right:
             st.subheader("Updated Analysis")
@@ -439,6 +589,7 @@ def render() -> None:
                 "Use this new image and correction notes to refine your previous analysis.\n\n"
                 f"Correction Notes:\n{correction_notes.strip() or 'None provided.'}"
             )
+
             correction_user_message = make_user_message(correction_image, correction_text)
 
             messages = list(st.session_state[CONVERSATION_MESSAGES])

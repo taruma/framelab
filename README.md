@@ -18,6 +18,7 @@ FrameLab is a lightweight multimodal AI web app for cinematic image analysis. It
 - Real-time streaming output in UI
 - Thought/reasoning stream shown in **Thought Process** expander
 - One-click copy buttons for Phase 1 and Phase 2 results (copied as plain text)
+- Per-phase **Request Transparency** expander (collapsed by default) showing request metadata and compact payload preview
 - Token usage summary (input/output/total) shown after successful responses when provider returns usage
 - Default request path uses **Responses API** (`client.responses.create`)
 - Automatic fallback to **Chat Completions** if Responses is unsupported/fails
@@ -112,6 +113,13 @@ Right panel shows:
 - Usage summary (`input`, `output`, `total` tokens) when provided by the endpoint/model
 - A **Copy Output (plain text)** button for one-click copying without markdown formatting
 
+Above the Phase 1 section, the app also shows a **🔎 Request Transparency** expander (collapsed by default):
+- `⚙️ Request`: provider, endpoint, model, reasoning effort
+- `📦 Payload`: compact one-line preview with distinct color segments (`system`, `image`, `context`), text truncated to 30 words
+- Live-updates as inputs change, so users can verify what will be sent before clicking **Analyze**
+
+The transparency panel now uses thinner text styling and richer visual emphasis (color + bold/italic/underline accents). Metadata fields are color-separated for quick scanning.
+
 ### 3) Phase 2 — Correction Loop
 
 Appears only after Phase 1 completes.
@@ -124,6 +132,10 @@ Appears only after Phase 1 completes.
 Model receives prior context and returns an updated analysis.
 
 Right panel also provides a **Copy Updated Analysis (plain text)** button for one-click copying of the latest corrected output.
+
+After the horizontal divider (before Phase 2 columns), the app shows the same **🔎 Request Transparency** expander for Phase 2, with payload preview sections for system prompt, original image token, prior assistant output, correction image token, and correction notes. This preview also live-updates from current Phase 2 inputs.
+
+Each transparency block uses the native expander toggle only (cleaner UI, no extra control buttons).
 
 ---
 
@@ -203,6 +215,10 @@ This conversation is persisted in `st.session_state`:
 - `.env.example` — sample env variable template
 - `pyproject.toml` — minimal dependencies
 - `AGENTS.md` — contributor/iteration guide for future changes
+
+
+
+
 
 
 

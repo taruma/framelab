@@ -8,3 +8,6 @@ dependencies = [
     "openai",
     "streamlit",
 ]
+
+[tool.poetry]
+package-mode = false

@@ -12,6 +12,9 @@ from openai import OpenAI
 
 from app_state import (
     CONVERSATION_MESSAGES,
+    IS_PROCESSING,
+    LAST_ERROR,
+    PENDING_ACTION,
     PHASE1_DONE,
     PHASE1_OUTPUT,
     PHASE1_REASONING,
@@ -322,6 +325,8 @@ def render() -> None:
     with st.sidebar:
         st.header("Settings")
 
+        ui_locked = st.session_state[IS_PROCESSING]
+
         if config_error:
             st.warning(config_error)
 
@@ -336,6 +341,7 @@ def render() -> None:
                 options=provider_ids,
                 index=default_provider_index,
                 format_func=lambda pid: providers.get(pid, {}).get("label", pid),
+                disabled=ui_locked,
             )
             selected_provider = providers.get(selected_provider_id, {})
             selected_provider_label = selected_provider.get("label", selected_provider_id)
@@ -353,7 +359,7 @@ def render() -> None:
                 else 0
             )
 
-            api_key_input = st.text_input("API Key", type="password")
+            api_key_input = st.text_input("API Key", type="password", disabled=ui_locked)
             effective_api_key, api_key_source = resolve_api_key(api_key_input, provider_env_key)
             if effective_api_key:
                 st.caption(f"API key source: {api_key_source}")
@@ -366,13 +372,15 @@ def render() -> None:
             base_url_input = st.text_input(
                 "Base URL / Endpoint",
                 value=provider_default_base_url,
+                disabled=ui_locked,
             )
             model_from_list = st.selectbox(
                 "Model",
                 options=provider_models or [provider_default_model],
                 index=model_default_index,
+                disabled=ui_locked,
             )
-            model_input = st.text_input("Model Override (optional)", value="")
+            model_input = st.text_input("Model Override (optional)", value="", disabled=ui_locked)
             reasoning_effort_input = st.selectbox(
                 "Reasoning Effort",
                 options=["none", "minimal", "low", "medium", "high"],
@@ -382,6 +390,7 @@ def render() -> None:
                     else "low"
                 ),
                 help="For reasoning-capable models/providers. The selected value is sent as-is.",
+                disabled=ui_locked,
             )
 
             effective_base_url = base_url_input.strip() or provider_default_base_url
@@ -398,6 +407,7 @@ def render() -> None:
             value="",
             placeholder="Leave empty to use system_prompt.txt",
             height=180,
+            disabled=ui_locked,
         )
         effective_system_prompt = system_prompt_override.strip() or file_prompt
 
@@ -420,11 +430,17 @@ def render() -> None:
             "Original Reference Image",
             type=["png", "jpg", "jpeg", "webp"],
             key="original_image",
+            disabled=ui_locked,
         )
         if original_image is not None:
             st.image(original_image, caption="Original image preview", width="stretch")
-        additional_context = st.text_area("Additional Context", key="additional_context", height=140)
-        analyze_clicked = st.button("Analyze", type="primary", width="stretch")
+        additional_context = st.text_area(
+            "Additional Context",
+            key="additional_context",
+            height=140,
+            disabled=ui_locked,
+        )
+        analyze_clicked = st.button("Analyze", type="primary", width="stretch", disabled=ui_locked)
 
     phase1_meta_preview, phase1_payload_preview = build_phase1_transparency_preview(
         provider_label=str(selected_provider_label),
@@ -462,7 +478,7 @@ def render() -> None:
                     key="phase1_copy_button",
                 )
 
-    if analyze_clicked:
+    if analyze_clicked and not ui_locked:
         if not effective_api_key:
             st.error("Please provide an API key in sidebar or set provider key / LLM_API_KEY / API_KEY in .env.")
             return
@@ -473,6 +489,12 @@ def render() -> None:
             st.error("Please upload an original reference image.")
             return
 
+        st.session_state[LAST_ERROR] = ""
+        st.session_state[IS_PROCESSING] = True
+        st.session_state[PENDING_ACTION] = "phase1"
+        st.rerun()
+
+    if st.session_state[PENDING_ACTION] == "phase1":
         client = OpenAI(api_key=effective_api_key, base_url=effective_base_url)
         messages = []
         if effective_system_prompt.strip():
@@ -486,32 +508,39 @@ def render() -> None:
         initial_user_message = make_user_message(original_image, initial_user_text)
         messages.append(initial_user_message)
 
-        with st.spinner("Analyzing image..."):
-            answer, thought, usage, prefer_responses_api = stream_response(
-                client,
-                effective_model,
-                messages,
-                phase1_thought_placeholder,
-                phase1_answer_placeholder,
-                reasoning_effort=effective_reasoning_effort,
-                prefer_responses_api=st.session_state[PREFER_RESPONSES_API],
-            )
-        st.session_state[PREFER_RESPONSES_API] = prefer_responses_api
-        render_usage(usage, phase1_usage_placeholder)
-        with phase1_copy_placeholder.container():
-            render_copy_button("Copy Output (plain text)", answer, key="phase1_copy_button")
+        try:
+            with st.spinner("Analyzing image..."):
+                answer, thought, usage, prefer_responses_api = stream_response(
+                    client,
+                    effective_model,
+                    messages,
+                    phase1_thought_placeholder,
+                    phase1_answer_placeholder,
+                    reasoning_effort=effective_reasoning_effort,
+                    prefer_responses_api=st.session_state[PREFER_RESPONSES_API],
+                )
+            st.session_state[PREFER_RESPONSES_API] = prefer_responses_api
+            render_usage(usage, phase1_usage_placeholder)
+            with phase1_copy_placeholder.container():
+                render_copy_button("Copy Output (plain text)", answer, key="phase1_copy_button")
 
-        st.session_state[PHASE1_DONE] = True
-        st.session_state[PHASE1_OUTPUT] = answer
-        st.session_state[PHASE1_REASONING] = thought
-        st.session_state[PHASE1_USAGE] = usage
-        st.session_state[PHASE2_OUTPUT] = ""
-        st.session_state[PHASE2_REASONING] = ""
-        st.session_state[PHASE2_USAGE] = None
+            st.session_state[PHASE1_DONE] = True
+            st.session_state[PHASE1_OUTPUT] = answer
+            st.session_state[PHASE1_REASONING] = thought
+            st.session_state[PHASE1_USAGE] = usage
+            st.session_state[PHASE2_OUTPUT] = ""
+            st.session_state[PHASE2_REASONING] = ""
+            st.session_state[PHASE2_USAGE] = None
 
-        st.session_state[CONVERSATION_MESSAGES] = messages + [
-            {"role": "assistant", "content": answer}
-        ]
+            st.session_state[CONVERSATION_MESSAGES] = messages + [
+                {"role": "assistant", "content": answer}
+            ]
+        except Exception as exc:
+            st.session_state[LAST_ERROR] = f"Analyze failed: {exc}"
+        finally:
+            st.session_state[PENDING_ACTION] = None
+            st.session_state[IS_PROCESSING] = False
+            st.rerun()
 
     if st.session_state[PHASE1_DONE]:
         st.divider()
@@ -524,6 +553,7 @@ def render() -> None:
                 "Upload the generated/incorrect image",
                 type=["png", "jpg", "jpeg", "webp"],
                 key="correction_image",
+                disabled=ui_locked,
             )
             if correction_image is not None:
                 st.image(correction_image, caption="Correction image preview", width="stretch")
@@ -532,8 +562,9 @@ def render() -> None:
                 key="correction_notes",
                 placeholder="Example: The lighting is too flat and shadows are missing.",
                 height=120,
+                disabled=ui_locked,
             )
-            correction_clicked = st.button("Submit Correction", width="stretch")
+            correction_clicked = st.button("Submit Correction", width="stretch", disabled=ui_locked)
 
         phase2_meta_preview, phase2_payload_preview = build_phase2_transparency_preview(
             provider_label=str(selected_provider_label),
@@ -572,7 +603,7 @@ def render() -> None:
                         key="phase2_copy_button",
                     )
 
-        if correction_clicked:
+        if correction_clicked and not ui_locked:
             if not effective_api_key:
                 st.error("Please provide an API key in sidebar or set provider key / LLM_API_KEY / API_KEY in .env.")
                 return
@@ -583,6 +614,12 @@ def render() -> None:
                 st.error("Please upload a correction image.")
                 return
 
+            st.session_state[LAST_ERROR] = ""
+            st.session_state[IS_PROCESSING] = True
+            st.session_state[PENDING_ACTION] = "phase2"
+            st.rerun()
+
+        if st.session_state[PENDING_ACTION] == "phase2":
             client = OpenAI(api_key=effective_api_key, base_url=effective_base_url)
 
             correction_text = (
@@ -595,30 +632,40 @@ def render() -> None:
             messages = list(st.session_state[CONVERSATION_MESSAGES])
             messages.append(correction_user_message)
 
-            with st.spinner("Applying correction..."):
-                answer, thought, usage, prefer_responses_api = stream_response(
-                    client,
-                    effective_model,
-                    messages,
-                    phase2_thought_placeholder,
-                    phase2_answer_placeholder,
-                    reasoning_effort=effective_reasoning_effort,
-                    prefer_responses_api=st.session_state[PREFER_RESPONSES_API],
-                )
-            st.session_state[PREFER_RESPONSES_API] = prefer_responses_api
-            render_usage(usage, phase2_usage_placeholder)
-            with phase2_copy_placeholder.container():
-                render_copy_button(
-                    "Copy Updated Analysis (plain text)",
-                    answer,
-                    key="phase2_copy_button",
-                )
+            try:
+                with st.spinner("Applying correction..."):
+                    answer, thought, usage, prefer_responses_api = stream_response(
+                        client,
+                        effective_model,
+                        messages,
+                        phase2_thought_placeholder,
+                        phase2_answer_placeholder,
+                        reasoning_effort=effective_reasoning_effort,
+                        prefer_responses_api=st.session_state[PREFER_RESPONSES_API],
+                    )
+                st.session_state[PREFER_RESPONSES_API] = prefer_responses_api
+                render_usage(usage, phase2_usage_placeholder)
+                with phase2_copy_placeholder.container():
+                    render_copy_button(
+                        "Copy Updated Analysis (plain text)",
+                        answer,
+                        key="phase2_copy_button",
+                    )
 
-            messages.append({"role": "assistant", "content": answer})
-            st.session_state[CONVERSATION_MESSAGES] = messages
-            st.session_state[PHASE2_OUTPUT] = answer
-            st.session_state[PHASE2_REASONING] = thought
-            st.session_state[PHASE2_USAGE] = usage
+                messages.append({"role": "assistant", "content": answer})
+                st.session_state[CONVERSATION_MESSAGES] = messages
+                st.session_state[PHASE2_OUTPUT] = answer
+                st.session_state[PHASE2_REASONING] = thought
+                st.session_state[PHASE2_USAGE] = usage
+            except Exception as exc:
+                st.session_state[LAST_ERROR] = f"Correction failed: {exc}"
+            finally:
+                st.session_state[PENDING_ACTION] = None
+                st.session_state[IS_PROCESSING] = False
+                st.rerun()
+
+    if st.session_state[LAST_ERROR]:
+        st.error(st.session_state[LAST_ERROR])
 
 
 if __name__ == "__main__":

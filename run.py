@@ -2,6 +2,7 @@ import os
 import re
 import json
 import sys
+import tomllib
 import html as html_lib
 from typing import Tuple
 
@@ -22,8 +23,16 @@ from app_state import (
     init_state,
 )
 from conversation import make_user_message
-from config import DEFAULT_BASE_URL, DEFAULT_MODEL
 from llm_streaming import stream_response
+
+
+DEFAULT_APP_CONFIG = {
+    "defaults": {
+        "provider": "",
+        "reasoning_effort": "low",
+    },
+    "providers": {},
+}
 
 
 def render_usage(usage: dict | None, placeholder: st.delta_generator.DeltaGenerator) -> None:
@@ -75,6 +84,43 @@ def load_system_prompt(path: str = "system_prompt.txt") -> Tuple[str, str]:
         return "", f"System prompt file not found: {path}"
     except OSError as exc:
         return "", f"Failed to read system prompt file ({path}): {exc}"
+
+
+def load_app_config(path: str = "config.toml") -> tuple[dict, str]:
+    try:
+        with open(path, "rb") as f:
+            loaded = tomllib.load(f)
+        return loaded, ""
+    except FileNotFoundError:
+        return DEFAULT_APP_CONFIG, f"Config file not found: {path}. Using built-in defaults."
+    except tomllib.TOMLDecodeError as exc:
+        return DEFAULT_APP_CONFIG, f"Invalid TOML in {path}: {exc}. Using built-in defaults."
+    except OSError as exc:
+        return DEFAULT_APP_CONFIG, f"Failed to read config file ({path}): {exc}. Using built-in defaults."
+
+
+def resolve_api_key(sidebar_key: str, provider_env_key: str) -> tuple[str, str]:
+    typed_key = sidebar_key.strip()
+    if typed_key:
+        return typed_key, "sidebar input"
+
+    provider_key = os.environ.get(provider_env_key, "").strip() if provider_env_key else ""
+    if provider_key:
+        return provider_key, f".env (`{provider_env_key}`)"
+
+    generic_key = os.environ.get("LLM_API_KEY", "").strip()
+    if generic_key:
+        return generic_key, ".env (`LLM_API_KEY`)"
+
+    legacy_key = os.environ.get("API_KEY", "").strip()
+    if legacy_key:
+        return legacy_key, ".env (`API_KEY`)"
+
+    openai_legacy_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if openai_legacy_key:
+        return openai_legacy_key, ".env (`OPENAI_API_KEY`, legacy)"
+
+    return "", "not found"
 
 
 def markdown_to_plain_text(text: str) -> str:
@@ -132,55 +178,92 @@ def render() -> None:
     st.set_page_config(page_title="Multimodal Analysis + Correction", layout="wide")
     init_state()
     load_env_file()
+    app_config, config_error = load_app_config()
 
     file_prompt, prompt_error = load_system_prompt()
 
     st.title("🧠 Multimodal Image Analysis")
     st.caption("Analyze a reference image, then iterate with correction images and notes.")
 
+    providers = app_config.get("providers", {})
+    defaults = app_config.get("defaults", {})
+    provider_ids = list(providers.keys())
+    default_provider_id = defaults.get("provider", provider_ids[0] if provider_ids else "")
+    if default_provider_id not in providers and provider_ids:
+        default_provider_id = provider_ids[0]
+
     with st.sidebar:
-        st.header("Model Settings")
+        st.header("Settings")
+
+        if config_error:
+            st.warning(config_error)
+
+        st.markdown("#### API Setup")
+        if not provider_ids:
+            st.error("No providers found in config.toml. Please add at least one provider.")
+            return
+
+        default_provider_index = provider_ids.index(default_provider_id)
+        selected_provider_id = st.selectbox(
+            "Provider",
+            options=provider_ids,
+            index=default_provider_index,
+            format_func=lambda pid: providers.get(pid, {}).get("label", pid),
+        )
+        selected_provider = providers.get(selected_provider_id, {})
+
+        provider_default_base_url = str(selected_provider.get("base_url", "")).strip()
+        provider_default_model = str(selected_provider.get("default_model", "")).strip()
+        provider_env_key = str(selected_provider.get("env_key", "")).strip()
+        provider_models = selected_provider.get("models", []) or []
+        provider_models = [str(m).strip() for m in provider_models if str(m).strip()]
+        if provider_default_model and provider_default_model not in provider_models:
+            provider_models.insert(0, provider_default_model)
+        model_default_index = (
+            provider_models.index(provider_default_model)
+            if provider_default_model and provider_default_model in provider_models
+            else 0
+        )
+
         api_key_input = st.text_input("API Key", type="password")
-        env_api_key = os.environ.get("OPENAI_API_KEY", "").strip()
-        effective_api_key = api_key_input.strip() or env_api_key
-        if api_key_input.strip():
-            st.caption("Using API key from sidebar input.")
-        elif env_api_key:
-            st.caption("Using API key from .env (`OPENAI_API_KEY`).")
+        effective_api_key, api_key_source = resolve_api_key(api_key_input, provider_env_key)
+        if effective_api_key:
+            st.caption(f"API key source: {api_key_source}")
         else:
-            st.caption("No API key found yet. Enter one in sidebar or set `OPENAI_API_KEY` in .env.")
+            st.caption(
+                "No API key found. Use sidebar input or set one of: "
+                f"`{provider_env_key}` / `LLM_API_KEY` / `API_KEY` / `OPENAI_API_KEY`."
+            )
 
         base_url_input = st.text_input(
             "Base URL / Endpoint",
-            value="",
-            placeholder=f"Leave empty to use default: {DEFAULT_BASE_URL}",
+            value=provider_default_base_url,
         )
-        model_input = st.text_input(
-            "Model Name",
-            value="",
-            placeholder=f"Leave empty to use default: {DEFAULT_MODEL}",
+        model_from_list = st.selectbox(
+            "Model",
+            options=provider_models or [provider_default_model],
+            index=model_default_index,
         )
+        model_input = st.text_input("Model Override (optional)", value="")
         reasoning_effort_input = st.selectbox(
             "Reasoning Effort",
             options=["none", "minimal", "low", "medium", "high"],
-            index=2,
+            index=["none", "minimal", "low", "medium", "high"].index(
+                defaults.get("reasoning_effort", "low")
+                if defaults.get("reasoning_effort", "low") in ["none", "minimal", "low", "medium", "high"]
+                else "low"
+            ),
             help="For reasoning-capable models/providers. The selected value is sent as-is.",
         )
 
-        effective_base_url = base_url_input.strip() or DEFAULT_BASE_URL
-        effective_model = model_input.strip() or DEFAULT_MODEL
+        effective_base_url = base_url_input.strip() or provider_default_base_url
+        effective_model = model_input.strip() or model_from_list or provider_default_model
         effective_reasoning_effort = reasoning_effort_input
 
-        st.caption(
-            f"Endpoint in use: {'Sidebar override' if base_url_input.strip() else 'config.py default'}"
-        )
-        st.caption(
-            f"Model in use: {'Sidebar override' if model_input.strip() else 'config.py default'}"
-        )
-        st.caption(
-            "Reasoning effort in use: "
-            f"{reasoning_effort_input}"
-        )
+        st.caption(f"Reasoning effort: {reasoning_effort_input}")
+
+        st.divider()
+        st.markdown("#### System Prompt")
 
         system_prompt_override = st.text_area(
             "System Prompt Override (optional)",
@@ -235,7 +318,7 @@ def render() -> None:
 
     if analyze_clicked:
         if not effective_api_key:
-            st.error("Please provide an API key in the sidebar or set OPENAI_API_KEY in .env.")
+            st.error("Please provide an API key in sidebar or set provider key / LLM_API_KEY / API_KEY in .env.")
             return
         if not effective_model:
             st.error("Please provide a model name.")
@@ -326,7 +409,7 @@ def render() -> None:
 
         if correction_clicked:
             if not effective_api_key:
-                st.error("Please provide an API key in the sidebar or set OPENAI_API_KEY in .env.")
+                st.error("Please provide an API key in sidebar or set provider key / LLM_API_KEY / API_KEY in .env.")
                 return
             if not effective_model:
                 st.error("Please provide a model name.")

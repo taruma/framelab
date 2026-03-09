@@ -420,8 +420,6 @@ def render() -> None:
             f"System prompt in use: {'Sidebar override' if system_prompt_override.strip() else 'system_prompt.txt'}"
         )
 
-    phase1_transparency_placeholder = st.empty()
-
     left_col, right_col = st.columns([1, 1.2], gap="large")
 
     with left_col:
@@ -440,23 +438,23 @@ def render() -> None:
             height=140,
             disabled=ui_locked,
         )
-        analyze_clicked = st.button("Analyze", type="primary", width="stretch", disabled=ui_locked)
 
-    phase1_meta_preview, phase1_payload_preview = build_phase1_transparency_preview(
-        provider_label=str(selected_provider_label),
-        endpoint=effective_base_url,
-        model=effective_model,
-        reasoning=effective_reasoning_effort,
-        system_prompt=effective_system_prompt,
-        additional_context=additional_context,
-        has_reference_image=original_image is not None,
-    )
-    with phase1_transparency_placeholder.container():
+        phase1_meta_preview, phase1_payload_preview = build_phase1_transparency_preview(
+            provider_label=str(selected_provider_label),
+            endpoint=effective_base_url,
+            model=effective_model,
+            reasoning=effective_reasoning_effort,
+            system_prompt=effective_system_prompt,
+            additional_context=additional_context,
+            has_reference_image=original_image is not None,
+        )
         render_transparency_block(
             phase1_meta_preview,
             phase1_payload_preview,
             key="phase1_transparency_preview",
         )
+
+        analyze_clicked = st.button("Analyze", type="primary", width="stretch", disabled=ui_locked)
 
     with right_col:
         st.subheader("Phase 1 Output")
@@ -544,7 +542,6 @@ def render() -> None:
 
     if st.session_state[PHASE1_DONE]:
         st.divider()
-        phase2_transparency_placeholder = st.empty()
         corr_left, corr_right = st.columns([1, 1.2], gap="large")
 
         with corr_left:
@@ -564,24 +561,24 @@ def render() -> None:
                 height=120,
                 disabled=ui_locked,
             )
-            correction_clicked = st.button("Submit Correction", width="stretch", disabled=ui_locked)
 
-        phase2_meta_preview, phase2_payload_preview = build_phase2_transparency_preview(
-            provider_label=str(selected_provider_label),
-            endpoint=effective_base_url,
-            model=effective_model,
-            reasoning=effective_reasoning_effort,
-            system_prompt=effective_system_prompt,
-            phase1_output=st.session_state[PHASE1_OUTPUT],
-            correction_notes=correction_notes,
-            has_correction_image=correction_image is not None,
-        )
-        with phase2_transparency_placeholder.container():
+            phase2_meta_preview, phase2_payload_preview = build_phase2_transparency_preview(
+                provider_label=str(selected_provider_label),
+                endpoint=effective_base_url,
+                model=effective_model,
+                reasoning=effective_reasoning_effort,
+                system_prompt=effective_system_prompt,
+                phase1_output=st.session_state[PHASE1_OUTPUT],
+                correction_notes=correction_notes,
+                has_correction_image=correction_image is not None,
+            )
             render_transparency_block(
                 phase2_meta_preview,
                 phase2_payload_preview,
                 key="phase2_transparency_preview",
             )
+
+            correction_clicked = st.button("Submit Correction", width="stretch", disabled=ui_locked)
 
         with corr_right:
             st.subheader("Updated Analysis")

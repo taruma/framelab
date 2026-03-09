@@ -7,25 +7,32 @@ label = "BytePlus"
 base_url = "https://ark.ap-southeast.bytepluses.com/api/v3"
 default_model = "seed-2-0-lite-260228"
 env_key = "BYTEPLUS_API_KEY"
-models = ["seed-2-0-lite-260228", "seed-2-0-mini-260215"]
+models = ["seed-2-0-mini-260215", "seed-2-0-lite-260228"]
 
 [providers.openai]
 label = "OpenAI"
 base_url = "https://api.openai.com/v1"
 default_model = "gpt-5-mini"
 env_key = "OPENAI_API_KEY"
-models = ["gpt-5.4", "gpt-5", "gpt-5-mini"]
+models = ["gpt-5-mini", "gpt-5", "gpt-5.4"]
 
 [providers.gemini]
 label = "Gemini (OpenAI-compatible)"
 base_url = "https://generativelanguage.googleapis.com/v1beta/openai/"
 default_model = "gemini-3-flash-preview"
 env_key = "GEMINI_API_KEY"
-models = ["gemini-3.1-pro-preview", "gemini-3-flash-preview","gemini-3.1-flash-lite-preview"]
+models = ["gemini-3.1-flash-lite-preview", "gemini-3-flash-preview", "gemini-3.1-pro-preview"]
 
 [providers.openrouter]
 label = "OpenRouter"
 base_url = "https://openrouter.ai/api/v1"
 default_model = "bytedance-seed/seed-2.0-mini"
 env_key = "OPENROUTER_API_KEY"
-models = ["bytedance-seed/seed-2.0-mini", "qwen/qwen3.5-35b-a3b", "anthropic/claude-sonnet-4.6"]
+models = ["bytedance-seed/seed-2.0-mini", "qwen/qwen3.5-flash-02-23", "moonshotai/kimi-k2.5", "z-ai/glm-4.6v"]
+
+[providers.claude]
+label = "Claude (OpenAI-compatible)"
+base_url = "https://api.anthropic.com/v1"
+default_model = "claude-haiku-4-5-20251001"
+env_key = "ANTHROPIC_API_KEY"
+models = ["claude-haiku-4-5-20251001", "claude-sonnet-4-6"]

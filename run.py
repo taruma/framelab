@@ -213,69 +213,69 @@ def render() -> None:
         if config_error:
             st.warning(config_error)
 
-        st.markdown("#### API Setup")
-        if not provider_ids:
-            st.error("No providers found in config.toml. Please add at least one provider.")
-            return
+        with st.expander("API Setup", expanded=True):
+            if not provider_ids:
+                st.error("No providers found in config.toml. Please add at least one provider.")
+                return
 
-        default_provider_index = provider_ids.index(default_provider_id)
-        selected_provider_id = st.selectbox(
-            "Provider",
-            options=provider_ids,
-            index=default_provider_index,
-            format_func=lambda pid: providers.get(pid, {}).get("label", pid),
-        )
-        selected_provider = providers.get(selected_provider_id, {})
+            default_provider_index = provider_ids.index(default_provider_id)
+            selected_provider_id = st.selectbox(
+                "Provider",
+                options=provider_ids,
+                index=default_provider_index,
+                format_func=lambda pid: providers.get(pid, {}).get("label", pid),
+            )
+            selected_provider = providers.get(selected_provider_id, {})
 
-        provider_default_base_url = str(selected_provider.get("base_url", "")).strip()
-        provider_default_model = str(selected_provider.get("default_model", "")).strip()
-        provider_env_key = str(selected_provider.get("env_key", "")).strip()
-        provider_models = selected_provider.get("models", []) or []
-        provider_models = [str(m).strip() for m in provider_models if str(m).strip()]
-        if provider_default_model and provider_default_model not in provider_models:
-            provider_models.insert(0, provider_default_model)
-        model_default_index = (
-            provider_models.index(provider_default_model)
-            if provider_default_model and provider_default_model in provider_models
-            else 0
-        )
-
-        api_key_input = st.text_input("API Key", type="password")
-        effective_api_key, api_key_source = resolve_api_key(api_key_input, provider_env_key)
-        if effective_api_key:
-            st.caption(f"API key source: {api_key_source}")
-        else:
-            st.caption(
-                "No API key found. Use sidebar input or set one of: "
-                f"`{provider_env_key}` / `LLM_API_KEY` / `API_KEY` / `OPENAI_API_KEY`."
+            provider_default_base_url = str(selected_provider.get("base_url", "")).strip()
+            provider_default_model = str(selected_provider.get("default_model", "")).strip()
+            provider_env_key = str(selected_provider.get("env_key", "")).strip()
+            provider_models = selected_provider.get("models", []) or []
+            provider_models = [str(m).strip() for m in provider_models if str(m).strip()]
+            if provider_default_model and provider_default_model not in provider_models:
+                provider_models.insert(0, provider_default_model)
+            model_default_index = (
+                provider_models.index(provider_default_model)
+                if provider_default_model and provider_default_model in provider_models
+                else 0
             )
 
-        base_url_input = st.text_input(
-            "Base URL / Endpoint",
-            value=provider_default_base_url,
-        )
-        model_from_list = st.selectbox(
-            "Model",
-            options=provider_models or [provider_default_model],
-            index=model_default_index,
-        )
-        model_input = st.text_input("Model Override (optional)", value="")
-        reasoning_effort_input = st.selectbox(
-            "Reasoning Effort",
-            options=["none", "minimal", "low", "medium", "high"],
-            index=["none", "minimal", "low", "medium", "high"].index(
-                defaults.get("reasoning_effort", "low")
-                if defaults.get("reasoning_effort", "low") in ["none", "minimal", "low", "medium", "high"]
-                else "low"
-            ),
-            help="For reasoning-capable models/providers. The selected value is sent as-is.",
-        )
+            api_key_input = st.text_input("API Key", type="password")
+            effective_api_key, api_key_source = resolve_api_key(api_key_input, provider_env_key)
+            if effective_api_key:
+                st.caption(f"API key source: {api_key_source}")
+            else:
+                st.caption(
+                    "No API key found. Use sidebar input or set one of: "
+                    f"`{provider_env_key}` / `LLM_API_KEY` / `API_KEY` / `OPENAI_API_KEY`."
+                )
 
-        effective_base_url = base_url_input.strip() or provider_default_base_url
-        effective_model = model_input.strip() or model_from_list or provider_default_model
-        effective_reasoning_effort = reasoning_effort_input
+            base_url_input = st.text_input(
+                "Base URL / Endpoint",
+                value=provider_default_base_url,
+            )
+            model_from_list = st.selectbox(
+                "Model",
+                options=provider_models or [provider_default_model],
+                index=model_default_index,
+            )
+            model_input = st.text_input("Model Override (optional)", value="")
+            reasoning_effort_input = st.selectbox(
+                "Reasoning Effort",
+                options=["none", "minimal", "low", "medium", "high"],
+                index=["none", "minimal", "low", "medium", "high"].index(
+                    defaults.get("reasoning_effort", "low")
+                    if defaults.get("reasoning_effort", "low") in ["none", "minimal", "low", "medium", "high"]
+                    else "low"
+                ),
+                help="For reasoning-capable models/providers. The selected value is sent as-is.",
+            )
 
-        st.caption(f"Reasoning effort: {reasoning_effort_input}")
+            effective_base_url = base_url_input.strip() or provider_default_base_url
+            effective_model = model_input.strip() or model_from_list or provider_default_model
+            effective_reasoning_effort = reasoning_effort_input
+
+            st.caption(f"Reasoning effort: {reasoning_effort_input}")
 
         st.divider()
         st.markdown("#### System Prompt")

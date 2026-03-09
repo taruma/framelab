@@ -1,6 +1,6 @@
 [project]
 name = "framelab"
-version = "1.1.0"
+version = "1.1.1"
 description = "FrameLab is a lightweight multimodal AI web app for cinematic image analysis."
 readme = "README.md"
 requires-python = ">=3.11"

@@ -76,11 +76,10 @@ def truncate_words(text: str, limit: int = TRANSPARENCY_PREVIEW_WORDS) -> str:
 
 def transparency_chip(label: str, color: str, content: str) -> str:
     safe_content = html_lib.escape(content)
-    safe_label = html_lib.escape(label)
     return (
-        f"<span style='color:{color};font-weight:600'>[{safe_label}: {safe_content}]</span>"
+        f"<span style='color:{color};font-weight:600'>[{safe_content}]</span>"
         if content
-        else f"<span style='color:{color};font-weight:600'>[{safe_label}]</span>"
+        else f"<span style='color:{color};font-weight:600'>[...]</span>"
     )
 
 
@@ -119,13 +118,10 @@ def build_phase1_transparency_preview(
     model: str,
     reasoning: str,
     system_prompt: str,
-    additional_context: str,
+    initial_prompt: str,
     has_reference_image: bool,
 ) -> tuple[dict[str, str], list[str]]:
-    initial_user_text = (
-        "Analyze this reference image in highly detailed technical and creative terms.\n\n"
-        f"Additional Context:\n{additional_context.strip() or 'None provided.'}"
-    )
+    initial_user_text = initial_prompt.strip()
     meta = {
         "provider": provider_label or "-",
         "endpoint": endpoint or "-",
@@ -147,13 +143,10 @@ def build_phase2_transparency_preview(
     reasoning: str,
     system_prompt: str,
     phase1_output: str,
-    correction_notes: str,
+    correction_prompt: str,
     has_correction_image: bool,
 ) -> tuple[dict[str, str], list[str]]:
-    correction_text = (
-        "Use this new image and correction notes to refine your previous analysis.\n\n"
-        f"Correction Notes:\n{correction_notes.strip() or 'None provided.'}"
-    )
+    correction_text = correction_prompt.strip()
     meta = {
         "provider": provider_label or "-",
         "endpoint": endpoint or "-",
@@ -432,9 +425,10 @@ def render() -> None:
         )
         if original_image is not None:
             st.image(original_image, caption="Original image preview", width="stretch")
-        additional_context = st.text_area(
-            "Additional Context",
-            key="additional_context",
+        initial_prompt = st.text_area(
+            "Initial Prompt",
+            key="initial_prompt",
+            value="Analyze this reference image in highly detailed technical and creative terms.",
             height=140,
             disabled=ui_locked,
         )
@@ -445,7 +439,7 @@ def render() -> None:
             model=effective_model,
             reasoning=effective_reasoning_effort,
             system_prompt=effective_system_prompt,
-            additional_context=additional_context,
+            initial_prompt=initial_prompt,
             has_reference_image=original_image is not None,
         )
         render_transparency_block(
@@ -498,10 +492,7 @@ def render() -> None:
         if effective_system_prompt.strip():
             messages.append({"role": "system", "content": effective_system_prompt.strip()})
 
-        initial_user_text = (
-            "Analyze this reference image in highly detailed technical and creative terms.\n\n"
-            f"Additional Context:\n{additional_context.strip() or 'None provided.'}"
-        )
+        initial_user_text = initial_prompt.strip()
 
         initial_user_message = make_user_message(original_image, initial_user_text)
         messages.append(initial_user_message)
@@ -555,9 +546,10 @@ def render() -> None:
             if correction_image is not None:
                 st.image(correction_image, caption="Correction image preview", width="stretch")
             correction_notes = st.text_area(
-                "Correction Notes",
+                "Correction Prompt",
                 key="correction_notes",
-                placeholder="Example: The lighting is too flat and shadows are missing.",
+                value="Use this new image and correction notes to refine your previous analysis.",
+                placeholder="Describe exactly how the model should correct the prior analysis.",
                 height=120,
                 disabled=ui_locked,
             )
@@ -569,7 +561,7 @@ def render() -> None:
                 reasoning=effective_reasoning_effort,
                 system_prompt=effective_system_prompt,
                 phase1_output=st.session_state[PHASE1_OUTPUT],
-                correction_notes=correction_notes,
+                correction_prompt=correction_notes,
                 has_correction_image=correction_image is not None,
             )
             render_transparency_block(
@@ -619,10 +611,7 @@ def render() -> None:
         if st.session_state[PENDING_ACTION] == "phase2":
             client = OpenAI(api_key=effective_api_key, base_url=effective_base_url)
 
-            correction_text = (
-                "Use this new image and correction notes to refine your previous analysis.\n\n"
-                f"Correction Notes:\n{correction_notes.strip() or 'None provided.'}"
-            )
+            correction_text = correction_notes.strip()
 
             correction_user_message = make_user_message(correction_image, correction_text)
 

@@ -2,6 +2,8 @@
 
 FrameLab is a lightweight multimodal AI web app for cinematic image analysis. It accepts a reference image with optional context, streams detailed technical breakdowns (covering composition, lighting, and optics), and supports a correction loop where users can submit a new image with notes to refine the analysis. Built with Python + Streamlit + OpenAI SDK, it displays live streaming output, model reasoning/thinking, and token usage while supporting any OpenAI-compatible endpoint.
 
+The hero section includes Shields.io-style badges below the subtitle: a clickable latest-release version badge (linking to GitHub Releases), plus non-clickable MIT license and Python 3.11+ badges. The creator line (`© 2026 Taruma Sakti · Vibecoding with GPT-5.3-Codex · Built for my AI Filmmaking journey`) is shown below the "View on GitHub" line.
+
 > **⚙️ Default Configuration**: Provider presets now live in `config.toml` (BytePlus, OpenAI, Gemini, OpenRouter). Update that file to add/edit endpoints and models.
 
 ---
@@ -215,6 +217,8 @@ This conversation is persisted in `st.session_state`:
 - `.env.example` — sample env variable template
 - `pyproject.toml` — minimal dependencies
 - `AGENTS.md` — contributor/iteration guide for future changes
+
+
 
 
 

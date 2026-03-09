@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-03-09
+
+### Added
+
+- Provider presets via `config.toml` for endpoint/model selection (e.g., BytePlus/OpenAI/Gemini/OpenRouter)
+- Unified API key env fallback flow with `LLM_API_KEY` plus provider-specific key compatibility
+- Hero landing section (`hero.md`) with FrameLab branding and two-phase workflow guide
+- API Setup section wrapped in an expander for cleaner sidebar/UI layout
+- Per-phase Request Transparency preview panel showing provider, endpoint, model, reasoning setting, and compact payload preview
+- UI processing state controls to lock inputs/buttons during active analysis and prevent duplicate submissions
+- Hero badges (latest release, MIT license, Python 3.11+) and creator credit line
+
+### Changed
+
+- Request transparency previews are now rendered inline with each phase action panel for clearer workflow alignment
+- Setup/configuration docs now reflect provider preset workflow and unified env-key handling
+- Added `requirements.txt` for pip-based installs and set Poetry package mode to dependency-management-only (`package-mode = false`)
+
+### Fixed
+
+- Improved phase layout consistency by removing placeholder-based transparency rendering and placing action buttons after each inline preview
+
 ## [1.0.0] - 2026-03-08
 
 ### Added

@@ -6,6 +6,11 @@
 
 **FrameLab** is a lightweight, multimodal AI analysis workbench designed for cinematic media. Whether you're analyzing composition, lighting, or technical optics, FrameLab provides a streamlined interface to get deep insights from your images and videos.
 
+🌐 **Use it on the web:** [framelab.streamlit.app](https://framelab.streamlit.app)
+
+> [!TIP]
+> 🔐 **Keep your API key secure:** FrameLab does not provide API credits. To run analyses (local or web), bring your own compatible API key in the sidebar, never share keys/screenshots publicly, and monitor token usage/cost on your provider account.
+
 > [!IMPORTANT]
 > **Vibecoding Disclaimer**: This project is built using an AI-assisted "vibecoding" approach (rapid iteration with human supervision). It is experimental, may contain bugs, and could break unintentionally during updates. Use it as a creative tool, but keep your expectations grounded.
 
@@ -129,6 +134,8 @@ For technical/runtime details and behavior contracts, see [`docs/REFERENCE.md`](
 ---
 
 Built with ❤️ by **Taruma Sakti** · Vibecoding with GPT-5.3-Codex
+
+
 
 
 

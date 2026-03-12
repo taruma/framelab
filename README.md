@@ -1,6 +1,6 @@
 # FrameLab
 
-FrameLab is a lightweight multimodal AI web app for cinematic media analysis. It accepts a reference image or video with optional context, streams detailed technical breakdowns (covering composition, lighting, and optics), and supports a correction loop where users can submit a new image or MP4 video with notes to refine the analysis. Built with Python + Streamlit + OpenAI SDK, it displays live streaming output, model reasoning/thinking, and token usage while supporting any OpenAI-compatible endpoint.
+FrameLab is a lightweight multimodal AI web app for cinematic media analysis. It accepts a reference image or video with optional context, streams detailed technical breakdowns (covering composition, lighting, and optics), and supports a correction loop where users can submit a new image or video with notes to refine the analysis. Built with Python + Streamlit + OpenAI SDK, it displays live streaming output, model reasoning/thinking, and token usage while supporting any OpenAI-compatible endpoint.
 
 > **⚙️ Default Configuration**: Provider presets now live in `config.toml` (BytePlus, OpenAI, Gemini, OpenRouter). Update that file to add/edit endpoints and models.
 
@@ -17,7 +17,7 @@ FrameLab is a lightweight multimodal AI web app for cinematic media analysis. It
 - Optional per-preset metadata via `.meta.toml` (title/description/order)
 - Config-driven default preset selection via `config.toml` (`[prompts]`)
 - Sidebar/manual override precedence over selected presets
-- Uploaded media previews for both Phase 1 and Phase 2 (image or MP4 video)
+- Uploaded media previews for both Phase 1 and Phase 2 (image or video)
 - Real-time streaming output in UI
 - Thought/reasoning stream shown in **Thought Process** expander
 - One-click copy buttons for Phase 1 and Phase 2 results (copied as plain text)
@@ -117,7 +117,7 @@ uv run run.py
 
 ### 2) Phase 1 — Initial Analysis
 
-- Upload **Original Reference Media** (image or MP4 video)
+- Upload **Original Reference Media** (image or video)
 - Uploaded media is shown as a preview (`st.image` for images, `st.video` for videos)
 - Add **Additional Context** (optional)
 - Click **Analyze**
@@ -139,7 +139,7 @@ The transparency panel now uses thinner text styling and richer visual emphasis 
 
 Appears only after Phase 1 completes.
 
-- Upload **generated/incorrect media** (image or MP4 video)
+- Upload **generated/incorrect media** (image or video)
 - Uploaded correction media is shown as a preview
 - Add **Correction Notes** (what is wrong)
 - Click **Submit Correction**

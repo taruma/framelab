@@ -123,7 +123,7 @@ def validate_media_size(uploaded_file: Any, max_video_size_mb: int = MAX_VIDEO_U
     if isinstance(file_size, int) and file_size > max_bytes:
         actual_mb = file_size / (1024 * 1024)
         return (
-            f"Uploaded MP4 video is too large ({actual_mb:.1f} MB). "
+            f"Uploaded video is too large ({actual_mb:.1f} MB). "
             f"Please upload an MP4 up to {max_video_size_mb} MB."
         )
     return ""

@@ -34,7 +34,7 @@ Use Markdown for readability.
 ## Output structure
 Begin with:
 
-# TITLE: [descriptive title if none is provided]
+# [title if none is provided]
 
 Then write **one detailed paragraph** summarizing the full video or sequence. This paragraph must:
 - be a single continuous paragraph,

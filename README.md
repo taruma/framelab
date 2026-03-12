@@ -133,6 +133,7 @@ POS highlighting details:
 - Default is **OFF** (no extra NLP processing)
 - Per-phase controls let you choose exactly which POS tags to highlight (Verb, Adjective, Noun)
 - spaCy model is lazy-loaded and cached only when highlighting is enabled
+- Highlight rendering is markdown-aware and preserves markdown structure (for example headings, lists, inline formatting, links, and fenced code blocks)
 - If spaCy/model is unavailable, app falls back to normal output with a warning
 - Copy output remains plain text (highlight markup is render-only)
 
@@ -358,34 +359,6 @@ uv run run.py
 - `.env.example` — sample env variable template
 - `pyproject.toml` — runtime dependencies
 - `AGENTS.md` — contributor/iteration guide for future changes
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

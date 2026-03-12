@@ -66,6 +66,85 @@ def _escape_streamlit_color_text(text: str) -> str:
     return text.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
 
 
+FENCED_CODE_BLOCK_RE = re.compile(r"```[\s\S]*?```")
+INLINE_PROTECTED_MD_RE = re.compile(
+    r"(`[^`\n]+`|!\[[^\]]*\]\([^\)]*\)|\[[^\]]+\]\([^\)]*\)|\*\*[^*\n]+\*\*|__[^_\n]+__|\*[^*\n]+\*|_[^_\n]+_|~~[^~\n]+~~)"
+)
+LINE_PREFIX_MD_RE = re.compile(r"^(\s{0,3}(?:#{1,6}\s+|[-*+]\s+|\d+\.\s+|>\s+))")
+
+
+def _highlight_plain_segment_with_pos(
+    nlp: Any,
+    text: str,
+    highlight_pos_tags: set[str],
+    color_map: dict[str, str],
+) -> str:
+    if not text.strip():
+        return text
+
+    doc = nlp(text)
+    chunks: list[str] = []
+    for token in doc:
+        token_text = _escape_streamlit_color_text(token.text)
+        color = color_map.get(token.pos_)
+        if color and token.pos_ in highlight_pos_tags:
+            chunks.append(f":{color}[{token_text}]")
+        else:
+            chunks.append(token_text)
+        chunks.append(token.whitespace_)
+
+    return "".join(chunks)
+
+
+def _highlight_markdown_aware_with_pos(
+    nlp: Any,
+    text: str,
+    highlight_pos_tags: set[str],
+    color_map: dict[str, str],
+) -> str:
+    def highlight_non_fenced_text(non_fenced_text: str) -> str:
+        highlighted_lines: list[str] = []
+        for line in non_fenced_text.splitlines(keepends=True):
+            prefix_match = LINE_PREFIX_MD_RE.match(line)
+            if prefix_match:
+                prefix = prefix_match.group(1)
+                rest = line[len(prefix):]
+            else:
+                prefix = ""
+                rest = line
+
+            parts = INLINE_PROTECTED_MD_RE.split(rest)
+            rebuilt_parts: list[str] = []
+            for idx, part in enumerate(parts):
+                if not part:
+                    continue
+                if idx % 2 == 1:
+                    rebuilt_parts.append(part)
+                else:
+                    rebuilt_parts.append(
+                        _highlight_plain_segment_with_pos(nlp, part, highlight_pos_tags, color_map)
+                    )
+
+            highlighted_lines.append(prefix + "".join(rebuilt_parts))
+
+        return "".join(highlighted_lines)
+
+    result_parts: list[str] = []
+    last_end = 0
+    for match in FENCED_CODE_BLOCK_RE.finditer(text):
+        before = text[last_end:match.start()]
+        if before:
+            result_parts.append(highlight_non_fenced_text(before))
+        result_parts.append(match.group(0))
+        last_end = match.end()
+
+    tail = text[last_end:]
+    if tail:
+        result_parts.append(highlight_non_fenced_text(tail))
+
+    return "".join(result_parts)
+
+
 def pos_highlight_to_markdown(text: str, highlight_pos_tags: set[str]) -> tuple[str, str]:
     try:
         nlp = load_spacy_pos_tagger()
@@ -92,21 +171,9 @@ def pos_highlight_to_markdown(text: str, highlight_pos_tags: set[str]) -> tuple[
     }
 
     try:
-        doc = nlp(text)
+        return _highlight_markdown_aware_with_pos(nlp, text, highlight_pos_tags, color_map), ""
     except Exception as exc:
         return "", f"POS parsing failed: {exc}"
-
-    chunks: list[str] = []
-    for token in doc:
-        token_text = _escape_streamlit_color_text(token.text)
-        color = color_map.get(token.pos_)
-        if color and token.pos_ in highlight_pos_tags:
-            chunks.append(f":{color}[{token_text}]")
-        else:
-            chunks.append(token_text)
-        chunks.append(token.whitespace_)
-
-    return "".join(chunks), ""
 
 
 def render_answer_with_optional_pos_highlight(

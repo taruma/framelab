@@ -18,7 +18,8 @@ The app must remain easy to run and easy to modify.
 
 ## 2) Hard Constraints (Do Not Break)
 
-- Keep dependencies minimal: **only `streamlit` and `openai`** (plus Python stdlib).
+- Keep dependencies minimal: `streamlit` + `openai` as baseline, with approved optional POS-highlighting support via `spacy` + `en_core_web_sm`.
+- POS highlighting must remain optional and default OFF (no extra NLP processing unless user enables it).
 - Primary run command must remain: **`uv run run.py`**.
 - Preserve OpenAI-compatible flexibility:
   - user-provided API key
@@ -36,6 +37,7 @@ Keep the current lightweight modular layout unless explicitly asked otherwise.
   - Sidebar config handling (provider preset, API key, endpoint, model, reasoning effort, system prompt override)
   - Phase 1/Phase 2 orchestration and usage rendering
   - Per-phase Request Transparency preview and processing-state locking
+  - Optional EN POS highlighting for outputs (Verb/Adjective/Noun) with lazy/cached spaCy model loading
 - `app_state.py`
   - Session-state key constants and `init_state()` defaults
 - `conversation.py`
@@ -67,6 +69,8 @@ Must preserve:
   2) final streamed response
   3) usage caption (when provided)
 - One-click copy buttons for Phase 1 and Phase 2 outputs (plain text).
+- Optional POS highlighting controls per output (EN only), with separate selection for Verb/Adjective/Noun.
+- Highlighted rendering must not modify stored raw outputs; copy remains plain text.
 - Streaming should feel live (incremental updates, not batch render).
 
 ---
@@ -107,6 +111,10 @@ Any refactor must preserve this logic.
 - Different providers may vary in streaming/usage/reasoning fields; keep parsers resilient.
 - During active requests, inputs/actions should be locked to prevent duplicate submissions.
 - If adding provider-specific compatibility, keep defaults simple and avoid adding non-essential dependencies.
+
+Deployment note (spaCy model):
+
+- For Streamlit Cloud/reproducible builds, install `en_core_web_sm` at build time via `requirements.txt` (model wheel URL), not runtime download.
 
 ---
 
@@ -150,6 +158,8 @@ Before finishing any iteration, verify:
 - [ ] Request Transparency expander is present per phase and payload preview updates with current inputs
 - [ ] Initial/Correction preset loading populates editable textboxes; manual edits remain user-controlled
 - [ ] Copy output buttons work for Phase 1 and Phase 2 plain-text results
+- [ ] POS highlighting is optional/default OFF, and per-tag selection (Verb/Adjective/Noun) works when enabled
+- [ ] Copy output remains plain text even when highlighted rendering is enabled
 - [ ] Responses API path works, or fallback to Chat Completions works clearly
 - [ ] Usage caption behavior is correct (shown when available, fallback message otherwise)
 - [ ] `README.md` and `AGENTS.md` are up to date

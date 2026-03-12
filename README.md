@@ -8,7 +8,7 @@ FrameLab is a lightweight multimodal AI web app for cinematic media analysis. It
 
 ## Features
 
-- Minimal dependencies: only `streamlit` and `openai`
+- Lightweight dependencies: `streamlit`, `openai`, and optional POS-highlighting via `spacy`
 - OpenAI-compatible endpoint support via configurable **Base URL**
 - Provider/model/endpoint presets from `config.toml`
 - Sidebar override support for endpoint/model
@@ -69,7 +69,7 @@ LLM_API_KEY=your_real_key
 
 ```bash
 uv init
-uv add streamlit openai
+uv add streamlit openai spacy
 ```
 
 Then place `run.py` in the project root and start with:
@@ -125,8 +125,16 @@ uv run run.py
 Right panel shows:
 - **Thought Process** (if `reasoning_content`/reasoning deltas are returned)
 - Final streamed analysis
+- Optional POS highlighting controls (English only) with per-tag selection (Verb/Adjective/Noun)
 - Usage summary (`input`, `output`, `total` tokens) when provided by the endpoint/model
 - A **Copy Output (plain text)** button for one-click copying without markdown formatting
+
+POS highlighting details:
+- Default is **OFF** (no extra NLP processing)
+- Per-phase controls let you choose exactly which POS tags to highlight (Verb, Adjective, Noun)
+- spaCy model is lazy-loaded and cached only when highlighting is enabled
+- If spaCy/model is unavailable, app falls back to normal output with a warning
+- Copy output remains plain text (highlight markup is render-only)
 
 Above the Phase 1 section, the app also shows a **🔎 Request Transparency** expander (collapsed by default):
 - `⚙️ Request`: provider, endpoint, model, reasoning effort
@@ -304,6 +312,20 @@ uv run run.py
   - Some providers/models do not return usage in streaming mode.
   - App will show a fallback message when usage metadata is unavailable.
 
+- **POS highlight not working**
+  - This project expects `spacy==3.8.2` + `en_core_web_sm` to be installed from `requirements.txt`.
+  - For local repair, run:
+    - `uv add spacy==3.8.2`
+    - `uv pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl`
+  - Highlighting is English-oriented and may be inaccurate for multilingual output.
+
+### Streamlit Cloud deployment note (spaCy model)
+
+- The English model is installed at build time via `requirements.txt` wheel URL:
+  - `spacy==3.8.2`
+  - `en_core_web_sm-3.8.0` wheel URL
+- This avoids runtime model downloads and makes deployments deterministic.
+
 - **Media upload issues**
   - Supported: images (`png`, `jpg`, `jpeg`, `webp`) and video (`mp4` only).
   - App-level video limit: **20 MB** per MP4 file (in addition to any Streamlit/provider limits).
@@ -334,8 +356,11 @@ uv run run.py
 - `*.meta.toml` (optional sidecar per preset) — UI metadata (`title`, `description`, `order`)
 - `system_prompt.txt` — legacy fallback system prompt content
 - `.env.example` — sample env variable template
-- `pyproject.toml` — minimal dependencies
+- `pyproject.toml` — runtime dependencies
 - `AGENTS.md` — contributor/iteration guide for future changes
+
+
+
 
 
 

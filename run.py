@@ -55,6 +55,92 @@ DEFAULT_INITIAL_PROMPT = "Analyze this reference image in highly detailed techni
 DEFAULT_CORRECTION_PROMPT = "Use this new image and correction notes to refine your previous analysis."
 
 
+@st.cache_resource
+def load_spacy_pos_tagger() -> Any:
+    import spacy
+
+    return spacy.load("en_core_web_sm", disable=["ner", "parser", "lemmatizer"])
+
+
+def _escape_streamlit_color_text(text: str) -> str:
+    return text.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
+
+
+def pos_highlight_to_markdown(text: str, highlight_pos_tags: set[str]) -> tuple[str, str]:
+    try:
+        nlp = load_spacy_pos_tagger()
+    except ImportError:
+        return "", (
+            "spaCy is not installed. Run `uv add spacy`, then install model with "
+            "`uv run python -m spacy download en_core_web_sm`."
+        )
+    except Exception as exc:
+        if "Can't find model 'en_core_web_sm'" in str(exc):
+            return "", (
+                "spaCy model `en_core_web_sm` is missing. Install it with "
+                "`uv run python -m spacy download en_core_web_sm`."
+            )
+        return "", f"POS highlighter unavailable: {exc}"
+
+    if not highlight_pos_tags:
+        return text, ""
+
+    color_map = {
+        "VERB": "red-background",
+        "ADJ": "blue-background",
+        "NOUN": "green-background",
+    }
+
+    try:
+        doc = nlp(text)
+    except Exception as exc:
+        return "", f"POS parsing failed: {exc}"
+
+    chunks: list[str] = []
+    for token in doc:
+        token_text = _escape_streamlit_color_text(token.text)
+        color = color_map.get(token.pos_)
+        if color and token.pos_ in highlight_pos_tags:
+            chunks.append(f":{color}[{token_text}]")
+        else:
+            chunks.append(token_text)
+        chunks.append(token.whitespace_)
+
+    return "".join(chunks), ""
+
+
+def render_answer_with_optional_pos_highlight(
+    answer_placeholder: st.delta_generator.DeltaGenerator,
+    note_placeholder: st.delta_generator.DeltaGenerator,
+    text: str,
+    enable_highlight: bool,
+    selected_pos_tags: set[str],
+) -> None:
+    if not enable_highlight or not selected_pos_tags or not text.strip():
+        note_placeholder.empty()
+        answer_placeholder.markdown(text)
+        return
+
+    highlighted_text, error = pos_highlight_to_markdown(text, selected_pos_tags)
+    if error:
+        note_placeholder.warning(error)
+        answer_placeholder.markdown(text)
+        return
+
+    selected_labels = []
+    if "VERB" in selected_pos_tags:
+        selected_labels.append(":red-background[Verb]")
+    if "ADJ" in selected_pos_tags:
+        selected_labels.append(":blue-background[Adjective]")
+    if "NOUN" in selected_pos_tags:
+        selected_labels.append(":green-background[Noun]")
+
+    note_placeholder.caption(
+        "POS highlight (English only): " + " ".join(selected_labels)
+    )
+    answer_placeholder.markdown(highlighted_text)
+
+
 def render_usage(usage: dict | None, placeholder: st.delta_generator.DeltaGenerator) -> None:
     if not usage:
         placeholder.caption("Usage: not returned by this model/provider.")
@@ -655,16 +741,41 @@ def render() -> None:
 
     with right_col:
         st.subheader("Phase 1 Output")
+        phase1_highlight_enabled = st.checkbox(
+            "Highlight POS (EN only): verbs / adjectives / nouns",
+            key="phase1_pos_highlight",
+            value=False,
+        )
+        phase1_pos_options = {
+            "Verb": "VERB",
+            "Adjective": "ADJ",
+            "Noun": "NOUN",
+        }
+        phase1_selected_labels = st.multiselect(
+            "POS types to highlight",
+            options=list(phase1_pos_options.keys()),
+            default=list(phase1_pos_options.keys()),
+            key="phase1_pos_types",
+            disabled=not phase1_highlight_enabled,
+        )
+        phase1_selected_tags = {phase1_pos_options[label] for label in phase1_selected_labels}
         phase1_thought_expander = st.expander("Thought Process", expanded=True)
         phase1_thought_placeholder = phase1_thought_expander.empty()
         phase1_answer_placeholder = st.empty()
+        phase1_pos_note_placeholder = st.empty()
         phase1_usage_placeholder = st.empty()
         phase1_copy_placeholder = st.empty()
 
         if st.session_state[PHASE1_REASONING]:
             phase1_thought_placeholder.markdown(st.session_state[PHASE1_REASONING])
         if st.session_state[PHASE1_OUTPUT]:
-            phase1_answer_placeholder.markdown(st.session_state[PHASE1_OUTPUT])
+            render_answer_with_optional_pos_highlight(
+                phase1_answer_placeholder,
+                phase1_pos_note_placeholder,
+                st.session_state[PHASE1_OUTPUT],
+                phase1_highlight_enabled,
+                phase1_selected_tags,
+            )
             render_usage(st.session_state[PHASE1_USAGE], phase1_usage_placeholder)
             with phase1_copy_placeholder.container():
                 render_copy_button(
@@ -715,6 +826,13 @@ def render() -> None:
                 )
             st.session_state[PREFER_RESPONSES_API] = prefer_responses_api
             render_usage(usage, phase1_usage_placeholder)
+            render_answer_with_optional_pos_highlight(
+                phase1_answer_placeholder,
+                phase1_pos_note_placeholder,
+                answer,
+                phase1_highlight_enabled,
+                phase1_selected_tags,
+            )
             with phase1_copy_placeholder.container():
                 render_copy_button("Copy Output (plain text)", answer, key="phase1_copy_button")
 
@@ -832,16 +950,41 @@ def render() -> None:
 
         with corr_right:
             st.subheader("Updated Analysis")
+            phase2_highlight_enabled = st.checkbox(
+                "Highlight POS (EN only): verbs / adjectives / nouns",
+                key="phase2_pos_highlight",
+                value=False,
+            )
+            phase2_pos_options = {
+                "Verb": "VERB",
+                "Adjective": "ADJ",
+                "Noun": "NOUN",
+            }
+            phase2_selected_labels = st.multiselect(
+                "POS types to highlight",
+                options=list(phase2_pos_options.keys()),
+                default=list(phase2_pos_options.keys()),
+                key="phase2_pos_types",
+                disabled=not phase2_highlight_enabled,
+            )
+            phase2_selected_tags = {phase2_pos_options[label] for label in phase2_selected_labels}
             phase2_thought_expander = st.expander("Thought Process", expanded=True)
             phase2_thought_placeholder = phase2_thought_expander.empty()
             phase2_answer_placeholder = st.empty()
+            phase2_pos_note_placeholder = st.empty()
             phase2_usage_placeholder = st.empty()
             phase2_copy_placeholder = st.empty()
 
             if st.session_state[PHASE2_REASONING]:
                 phase2_thought_placeholder.markdown(st.session_state[PHASE2_REASONING])
             if st.session_state[PHASE2_OUTPUT]:
-                phase2_answer_placeholder.markdown(st.session_state[PHASE2_OUTPUT])
+                render_answer_with_optional_pos_highlight(
+                    phase2_answer_placeholder,
+                    phase2_pos_note_placeholder,
+                    st.session_state[PHASE2_OUTPUT],
+                    phase2_highlight_enabled,
+                    phase2_selected_tags,
+                )
                 render_usage(st.session_state[PHASE2_USAGE], phase2_usage_placeholder)
                 with phase2_copy_placeholder.container():
                     render_copy_button(
@@ -891,6 +1034,13 @@ def render() -> None:
                     )
                 st.session_state[PREFER_RESPONSES_API] = prefer_responses_api
                 render_usage(usage, phase2_usage_placeholder)
+                render_answer_with_optional_pos_highlight(
+                    phase2_answer_placeholder,
+                    phase2_pos_note_placeholder,
+                    answer,
+                    phase2_highlight_enabled,
+                    phase2_selected_tags,
+                )
                 with phase2_copy_placeholder.container():
                     render_copy_button(
                         "Copy Updated Analysis (plain text)",

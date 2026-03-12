@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "openai",
+    "spacy==3.8.2",
     "streamlit",
 ]
 

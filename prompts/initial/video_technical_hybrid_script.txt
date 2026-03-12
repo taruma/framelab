@@ -40,37 +40,23 @@ Style rules:
 - Preserve the pacing and sequence of the original video.
 - For long continuous takes, keep them as one shot but describe the internal action progression clearly.
 
-Output format:
+Output format (make sure you add new line and bullet point and use formatting markdown to easier to read):
+
 TITLE: [Use a descriptive title if none is provided]
 
 SCENE 1
 INT./EXT. LOCATION – TIME [only if obvious]
 
 SHOT 1 [00:00–00:05]
-Framing:
-Angle:
-Camera Movement:
-Action:
-Dialogue:
-Audio:
-On-Screen Text:
-Transition:
-
-SHOT 2 [00:05–00:09]
-Framing:
-Angle:
-Camera Movement:
-Action:
-Dialogue:
-Audio:
-On-Screen Text:
-Transition:
+- Framing:
+- Angle:
+- Camera Movement:
+- Action:
+- Dialogue:
+- Audio:
+- On-Screen Text:
+- Transition:
 
 Continue until the video ends.
-
-Formatting constraints:
-- Return plain text only (no markdown code fences).
-- Keep the exact section labels shown in the output format.
-- Do not add notes, commentary, or explanations outside the script.
 
 Return only the final technical hybrid script.

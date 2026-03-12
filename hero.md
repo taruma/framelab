@@ -1,7 +1,7 @@
 <div style="text-align: center; padding: 1rem 0 2rem 0;">
     <h1 style="margin-bottom: 0.5rem;">✨ FrameLab</h1>
     <p style="font-size: 1.1rem; color: #888; margin-bottom: 1.5rem;">
-        Cinematic image analysis with AI-powered insights and correction loops
+        Cinematic media analysis (image + video) with AI-powered insights and correction loops
     </p>
     <div style="display: flex; justify-content: center; align-items: center; gap: 0.45rem; flex-wrap: wrap; margin: -0.3rem 0 1.1rem 0;">
         <a href="https://github.com/taruma/framelab/releases/latest" target="_blank" style="display: inline-flex; line-height: 0; text-decoration: none;">
@@ -14,12 +14,12 @@
         <div style="text-align: center;">
             <span style="font-size: 1.5rem;">📷</span><br>
             <strong>Phase 1</strong><br>
-            <span style="color: #666; font-size: 0.9rem;">Upload reference image<br>Get detailed analysis</span>
+            <span style="color: #666; font-size: 0.9rem;">Upload reference media<br>Get detailed analysis</span>
         </div>
         <div style="text-align: center;">
             <span style="font-size: 1.5rem;">🔧</span><br>
             <strong>Phase 2</strong><br>
-            <span style="color: #666; font-size: 0.9rem;">Submit correction image<br>Refine your analysis</span>
+            <span style="color: #666; font-size: 0.9rem;">Submit correction media<br>Refine your analysis</span>
         </div>
     </div>
     <p style="margin-top: 1.5rem; font-size: 0.85rem; color: #666;">

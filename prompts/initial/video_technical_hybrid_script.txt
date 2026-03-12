@@ -1,0 +1,62 @@
+Analyze the provided video carefully and create a technical hybrid script based entirely on what is visible and audible in the footage.
+
+This is not a creative adaptation. It is a faithful, play-by-play reconstruction of the video in screenplay form, combined with a shot-by-shot technical breakdown.
+
+Your priorities are:
+1. Accuracy
+2. Readability
+3. Clear technical detail
+
+Requirements:
+- Follow the video in exact chronological order from beginning to end.
+- Show the action beat by beat so the reader can clearly understand everything happening on screen.
+- Write in a screenplay-style format, combined with a shot list and camera notes, so it reads like a technical hybrid script.
+- Do not invent details, motivations, dialogue, locations, or camera choices that are not clearly supported by the video.
+- If something is unclear, state that it is unclear instead of guessing.
+
+For each scene or shot, include:
+- Scene heading when appropriate (INT./EXT. – LOCATION – TIME OF DAY only if clearly identifiable)
+- Shot number
+- Approximate timecode
+- Shot type / framing (e.g. wide shot, medium shot, close-up, insert, over-the-shoulder, POV)
+- Camera angle if clear
+- Camera movement (e.g. static, pan, tilt, handheld, dolly, tracking, zoom, push-in, pull-back)
+- A clear description of the on-screen action in present tense
+- Dialogue transcribed as accurately and verbatim as possible
+- Important audio cues such as voice-over, music, sound effects, and ambient sound
+- On-screen text, titles, captions, or graphics exactly as they appear
+- Transitions or edits when relevant
+
+Dialogue rules:
+- Transcribe dialogue exactly when it is intelligible.
+- Do not paraphrase dialogue.
+- If a word or line cannot be clearly understood, mark it as [unclear] or [inaudible] rather than guessing.
+- If character names are not known, use neutral identifiers such as MAN, WOMAN, CHILD, DRIVER, etc.
+
+Style rules:
+- Keep the writing clear, professional, and easy to follow.
+- Use standard film and screenplay terminology.
+- Make it detailed enough to serve as both a readable script and a practical shot breakdown.
+- Preserve the pacing and sequence of the original video.
+- For long continuous takes, keep them as one shot but describe the internal action progression clearly.
+
+Output format (make sure you add new line and bullet point and use formatting markdown to easier to read):
+
+TITLE: [Use a descriptive title if none is provided]
+
+SCENE 1
+INT./EXT. LOCATION – TIME [only if obvious]
+
+SHOT 1 [00:00–00:05]
+- Framing:
+- Angle:
+- Camera Movement:
+- Action:
+- Dialogue:
+- Audio:
+- On-Screen Text:
+- Transition:
+
+Continue until the video ends.
+
+Return only the final technical hybrid script.

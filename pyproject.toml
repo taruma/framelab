@@ -1,11 +1,12 @@
 [project]
 name = "framelab"
-version = "1.1.1"
+version = "1.2.0"
 description = "FrameLab is a lightweight multimodal AI web app for cinematic image analysis."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "openai",
+    "spacy==3.8.2",
     "streamlit",
 ]
 

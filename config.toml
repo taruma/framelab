@@ -2,6 +2,14 @@
 provider = "openrouter"
 reasoning_effort = "low"
 
+[prompts]
+system_dir = "prompts/system"
+initial_dir = "prompts/initial"
+correction_dir = "prompts/correction"
+default_system = "cinematic_image_analysis.txt"
+default_initial = "detailed_technical_creative.txt"
+default_correction = "refine_with_correction_image.txt"
+
 [providers.byteplus]
 label = "BytePlus"
 base_url = "https://ark.ap-southeast.bytepluses.com/api/v3"

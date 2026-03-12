@@ -8,9 +8,9 @@ Guidance for future contributors/agents working on this repository.
 
 Build and maintain a **lightweight multimodal analysis app** that:
 
-1. Accepts a reference image + optional context
+1. Accepts a reference image or video + optional context
 2. Produces a detailed streamed analysis
-3. Supports a correction loop using a second image + correction notes
+3. Supports a correction loop using a second image or video + correction notes
 
 The app must remain easy to run and easy to modify.
 
@@ -18,7 +18,8 @@ The app must remain easy to run and easy to modify.
 
 ## 2) Hard Constraints (Do Not Break)
 
-- Keep dependencies minimal: **only `streamlit` and `openai`** (plus Python stdlib).
+- Keep dependencies minimal: `streamlit` + `openai` as baseline, with approved optional POS-highlighting support via `spacy` + `en_core_web_sm`.
+- POS highlighting must remain optional and default OFF (no extra NLP processing unless user enables it).
 - Primary run command must remain: **`uv run run.py`**.
 - Preserve OpenAI-compatible flexibility:
   - user-provided API key
@@ -33,8 +34,10 @@ Keep the current lightweight modular layout unless explicitly asked otherwise.
 
 - `run.py`
   - Streamlit UI layout and app bootstrap for `uv run run.py`
-  - Sidebar config handling (API key, endpoint, model, reasoning effort, system prompt override)
+  - Sidebar config handling (provider preset, API key, endpoint, model, reasoning effort, system prompt override)
   - Phase 1/Phase 2 orchestration and usage rendering
+  - Per-phase Request Transparency preview and processing-state locking
+  - Optional EN POS highlighting for outputs (Verb/Adjective/Noun) with lazy/cached spaCy model loading
 - `app_state.py`
   - Session-state key constants and `init_state()` defaults
 - `conversation.py`
@@ -42,8 +45,11 @@ Keep the current lightweight modular layout unless explicitly asked otherwise.
 - `llm_streaming.py`
   - Streaming transport and delta parsing
   - **Responses API first**, with automatic fallback to Chat Completions
-- `config.py`
-  - Default base URL and default model
+- `config.toml`
+  - Provider presets (endpoint/model), prompt directories, and default prompt selections
+- `prompts/`
+  - Folder-based preset sources for system, initial, and correction text
+  - Optional `.meta.toml` sidecars (`title`, `description`, `order`) for UI labels/descriptions
 - `system_prompt.txt`
   - Externalized default system prompt
 
@@ -56,10 +62,15 @@ Must preserve:
 - Two-column layout in each phase.
 - Phase 1 always visible.
 - Phase 2 visible **only** after Phase 1 is complete.
+- Per-phase **Request Transparency** expander (collapsed by default), with live-updating compact payload preview.
+- Editable prompt textboxes for Phase 1 (Initial Prompt) and Phase 2 (Correction Notes), with explicit preset load actions.
 - Right-side output order:
   1) `Thought Process` expander
   2) final streamed response
   3) usage caption (when provided)
+- One-click copy buttons for Phase 1 and Phase 2 outputs (plain text).
+- Optional POS highlighting controls per output (EN only), with separate selection for Verb/Adjective/Noun.
+- Highlighted rendering must not modify stored raw outputs; copy remains plain text.
 - Streaming should feel live (incremental updates, not batch render).
 
 ---
@@ -74,6 +85,12 @@ Session keys currently used:
 - `phase1_usage`
 - `phase2_output`, `phase2_reasoning`
 - `phase2_usage`
+
+Configuration/prompt precedence must remain:
+
+- API key resolution: sidebar input → provider env key (`config.toml`) → `LLM_API_KEY` → legacy fallback
+- System prompt resolution: manual override → selected system preset → config default system preset → `system_prompt.txt`
+- Initial prompt and correction notes source: editable textbox content (preset dropdown is loader input via explicit button)
 
 Correction payload message order must remain:
 
@@ -92,7 +109,12 @@ Any refactor must preserve this logic.
 - If Responses API fails/unsupported, app automatically falls back to
   `client.chat.completions.create(..., stream=True)`.
 - Different providers may vary in streaming/usage/reasoning fields; keep parsers resilient.
+- During active requests, inputs/actions should be locked to prevent duplicate submissions.
 - If adding provider-specific compatibility, keep defaults simple and avoid adding non-essential dependencies.
+
+Deployment note (spaCy model):
+
+- For Streamlit Cloud/reproducible builds, install `en_core_web_sm` at build time via `requirements.txt` (model wheel URL), not runtime download.
 
 ---
 
@@ -128,10 +150,16 @@ Only implement if requested:
 Before finishing any iteration, verify:
 
 - [ ] `uv run run.py` starts app successfully
+- [ ] Phase 1 accepts image/video and renders preview correctly (video = MP4)
 - [ ] Phase 1 streams output live
 - [ ] Thought Process expander updates when reasoning stream exists
 - [ ] Phase 2 appears only after Phase 1
 - [ ] Correction call includes prior assistant output in context
+- [ ] Request Transparency expander is present per phase and payload preview updates with current inputs
+- [ ] Initial/Correction preset loading populates editable textboxes; manual edits remain user-controlled
+- [ ] Copy output buttons work for Phase 1 and Phase 2 plain-text results
+- [ ] POS highlighting is optional/default OFF, and per-tag selection (Verb/Adjective/Noun) works when enabled
+- [ ] Copy output remains plain text even when highlighted rendering is enabled
 - [ ] Responses API path works, or fallback to Chat Completions works clearly
 - [ ] Usage caption behavior is correct (shown when available, fallback message otherwise)
 - [ ] `README.md` and `AGENTS.md` are up to date

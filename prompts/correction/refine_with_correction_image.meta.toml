@@ -1,0 +1,3 @@
+title = "Refine from Correction Image"
+description = "Use uploaded correction image + notes to improve prior analysis while preserving context."
+order = 10

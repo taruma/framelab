@@ -4,7 +4,8 @@ import json
 import sys
 import tomllib
 import html as html_lib
-from typing import Tuple
+from pathlib import Path
+from typing import Any, Tuple
 
 import streamlit as st
 from streamlit.components.v1 import html as st_html
@@ -34,10 +35,110 @@ DEFAULT_APP_CONFIG = {
         "provider": "",
         "reasoning_effort": "low",
     },
+    "prompts": {
+        "system_dir": "prompts/system",
+        "initial_dir": "prompts/initial",
+        "correction_dir": "prompts/correction",
+        "default_system": "",
+        "default_initial": "",
+        "default_correction": "",
+    },
     "providers": {},
 }
 
 TRANSPARENCY_PREVIEW_WORDS = 30
+MAX_VIDEO_UPLOAD_MB = 20
+SUPPORTED_IMAGE_TYPES = ["png", "jpg", "jpeg", "webp"]
+SUPPORTED_VIDEO_TYPES = ["mp4"]
+SUPPORTED_MEDIA_TYPES = SUPPORTED_IMAGE_TYPES + SUPPORTED_VIDEO_TYPES
+DEFAULT_INITIAL_PROMPT = "Analyze this reference image in highly detailed technical and creative terms."
+DEFAULT_CORRECTION_PROMPT = "Use this new image and correction notes to refine your previous analysis."
+
+
+@st.cache_resource
+def load_spacy_pos_tagger() -> Any:
+    import spacy
+
+    return spacy.load("en_core_web_sm", disable=["ner", "parser", "lemmatizer"])
+
+
+def _escape_streamlit_color_text(text: str) -> str:
+    return text.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
+
+
+def pos_highlight_to_markdown(text: str, highlight_pos_tags: set[str]) -> tuple[str, str]:
+    try:
+        nlp = load_spacy_pos_tagger()
+    except ImportError:
+        return "", (
+            "spaCy is not installed. Run `uv add spacy`, then install model with "
+            "`uv run python -m spacy download en_core_web_sm`."
+        )
+    except Exception as exc:
+        if "Can't find model 'en_core_web_sm'" in str(exc):
+            return "", (
+                "spaCy model `en_core_web_sm` is missing. Install it with "
+                "`uv run python -m spacy download en_core_web_sm`."
+            )
+        return "", f"POS highlighter unavailable: {exc}"
+
+    if not highlight_pos_tags:
+        return text, ""
+
+    color_map = {
+        "VERB": "red-background",
+        "ADJ": "blue-background",
+        "NOUN": "green-background",
+    }
+
+    try:
+        doc = nlp(text)
+    except Exception as exc:
+        return "", f"POS parsing failed: {exc}"
+
+    chunks: list[str] = []
+    for token in doc:
+        token_text = _escape_streamlit_color_text(token.text)
+        color = color_map.get(token.pos_)
+        if color and token.pos_ in highlight_pos_tags:
+            chunks.append(f":{color}[{token_text}]")
+        else:
+            chunks.append(token_text)
+        chunks.append(token.whitespace_)
+
+    return "".join(chunks), ""
+
+
+def render_answer_with_optional_pos_highlight(
+    answer_placeholder: st.delta_generator.DeltaGenerator,
+    note_placeholder: st.delta_generator.DeltaGenerator,
+    text: str,
+    enable_highlight: bool,
+    selected_pos_tags: set[str],
+) -> None:
+    if not enable_highlight or not selected_pos_tags or not text.strip():
+        note_placeholder.empty()
+        answer_placeholder.markdown(text)
+        return
+
+    highlighted_text, error = pos_highlight_to_markdown(text, selected_pos_tags)
+    if error:
+        note_placeholder.warning(error)
+        answer_placeholder.markdown(text)
+        return
+
+    selected_labels = []
+    if "VERB" in selected_pos_tags:
+        selected_labels.append(":red-background[Verb]")
+    if "ADJ" in selected_pos_tags:
+        selected_labels.append(":blue-background[Adjective]")
+    if "NOUN" in selected_pos_tags:
+        selected_labels.append(":green-background[Noun]")
+
+    note_placeholder.caption(
+        "POS highlight (English only): " + " ".join(selected_labels)
+    )
+    answer_placeholder.markdown(highlighted_text)
 
 
 def render_usage(usage: dict | None, placeholder: st.delta_generator.DeltaGenerator) -> None:
@@ -83,6 +184,37 @@ def transparency_chip(label: str, color: str, content: str) -> str:
     )
 
 
+def get_media_kind(uploaded_file: Any) -> str:
+    if uploaded_file is None:
+        return "not selected"
+    mime = getattr(uploaded_file, "type", "") or ""
+    return "video" if mime.startswith("video/") else "image"
+
+
+def validate_media_size(uploaded_file: Any, max_video_size_mb: int = MAX_VIDEO_UPLOAD_MB) -> str:
+    if uploaded_file is None:
+        return ""
+
+    if get_media_kind(uploaded_file) != "video":
+        return ""
+
+    max_bytes = max_video_size_mb * 1024 * 1024
+    file_size = getattr(uploaded_file, "size", None)
+    if not isinstance(file_size, int):
+        try:
+            file_size = len(uploaded_file.getvalue())
+        except Exception:
+            file_size = None
+
+    if isinstance(file_size, int) and file_size > max_bytes:
+        actual_mb = file_size / (1024 * 1024)
+        return (
+            f"Uploaded video is too large ({actual_mb:.1f} MB). "
+            f"Please upload an MP4 up to {max_video_size_mb} MB."
+        )
+    return ""
+
+
 def render_transparency_block(
     metadata: dict[str, str],
     payload_chips: list[str],
@@ -119,7 +251,7 @@ def build_phase1_transparency_preview(
     reasoning: str,
     system_prompt: str,
     initial_prompt: str,
-    has_reference_image: bool,
+    reference_media_kind: str,
 ) -> tuple[dict[str, str], list[str]]:
     initial_user_text = initial_prompt.strip()
     meta = {
@@ -130,7 +262,7 @@ def build_phase1_transparency_preview(
     }
     payload = [
         transparency_chip("system", "#60a5fa", truncate_words(system_prompt)),
-        transparency_chip("reference image", "#f59e0b", "image" if has_reference_image else "not selected"),
+        transparency_chip("reference media", "#f59e0b", reference_media_kind),
         transparency_chip("prompt/context", "#34d399", truncate_words(initial_user_text)),
     ]
     return meta, payload
@@ -144,7 +276,7 @@ def build_phase2_transparency_preview(
     system_prompt: str,
     phase1_output: str,
     correction_prompt: str,
-    has_correction_image: bool,
+    correction_media_kind: str,
 ) -> tuple[dict[str, str], list[str]]:
     correction_text = correction_prompt.strip()
     meta = {
@@ -155,9 +287,9 @@ def build_phase2_transparency_preview(
     }
     payload = [
         transparency_chip("system", "#60a5fa", truncate_words(system_prompt)),
-        transparency_chip("reference image", "#f59e0b", "image"),
+        transparency_chip("reference media", "#f59e0b", "image/video"),
         transparency_chip("previous output", "#a78bfa", truncate_words(phase1_output)),
-        transparency_chip("correction image", "#f59e0b", "image" if has_correction_image else "not selected"),
+        transparency_chip("correction media", "#f59e0b", correction_media_kind),
         transparency_chip("correction notes", "#34d399", truncate_words(correction_text)),
     ]
     return meta, payload
@@ -192,6 +324,72 @@ def load_system_prompt(path: str = "system_prompt.txt") -> Tuple[str, str]:
         return "", f"System prompt file not found: {path}"
     except OSError as exc:
         return "", f"Failed to read system prompt file ({path}): {exc}"
+
+
+def load_prompt_presets(directory: str) -> tuple[list[dict], str]:
+    directory_path = Path(directory)
+    if not directory_path.exists():
+        return [], f"Prompt preset directory not found: {directory}"
+    if not directory_path.is_dir():
+        return [], f"Prompt preset path is not a directory: {directory}"
+
+    presets: list[dict] = []
+    warnings: list[str] = []
+
+    for txt_path in sorted(directory_path.glob("*.txt")):
+        try:
+            content = txt_path.read_text(encoding="utf-8").strip()
+        except OSError as exc:
+            warnings.append(f"Failed reading preset '{txt_path.name}': {exc}")
+            continue
+
+        meta = {}
+        meta_path = txt_path.with_suffix(".meta.toml")
+        if meta_path.exists():
+            try:
+                with meta_path.open("rb") as f:
+                    parsed = tomllib.load(f)
+                if isinstance(parsed, dict):
+                    meta = parsed
+            except Exception as exc:
+                warnings.append(f"Invalid metadata '{meta_path.name}': {exc}")
+
+        title = str(meta.get("title", "")).strip() or txt_path.stem.replace("_", " ").replace("-", " ").title()
+        description = str(meta.get("description", "")).strip()
+        order = meta.get("order", 1000)
+        try:
+            order = int(order)
+        except Exception:
+            order = 1000
+
+        presets.append(
+            {
+                "filename": txt_path.name,
+                "title": title,
+                "description": description,
+                "content": content,
+                "order": order,
+            }
+        )
+
+    presets.sort(key=lambda p: (p["order"], p["title"].lower(), p["filename"].lower()))
+
+    warning_message = "\n".join(warnings)
+    return presets, warning_message
+
+
+def pick_default_preset(options: list[dict], default_filename: str) -> dict | None:
+    if not options:
+        return None
+    for preset in options:
+        if preset["filename"] == default_filename:
+            return preset
+    return options[0]
+
+
+def init_textarea_state(key: str, initial_value: str) -> None:
+    if key not in st.session_state:
+        st.session_state[key] = initial_value
 
 
 def load_hero(path: str = "hero.md") -> Tuple[str, str]:
@@ -310,6 +508,23 @@ def render() -> None:
 
     providers = app_config.get("providers", {})
     defaults = app_config.get("defaults", {})
+    prompts_cfg = app_config.get("prompts", {})
+
+    system_dir = str(prompts_cfg.get("system_dir", "prompts/system")).strip() or "prompts/system"
+    initial_dir = str(prompts_cfg.get("initial_dir", "prompts/initial")).strip() or "prompts/initial"
+    correction_dir = str(prompts_cfg.get("correction_dir", "prompts/correction")).strip() or "prompts/correction"
+
+    default_system_file = str(prompts_cfg.get("default_system", "")).strip()
+    default_initial_file = str(prompts_cfg.get("default_initial", "")).strip()
+    default_correction_file = str(prompts_cfg.get("default_correction", "")).strip()
+
+    system_presets, system_presets_warning = load_prompt_presets(system_dir)
+    initial_presets, initial_presets_warning = load_prompt_presets(initial_dir)
+    correction_presets, correction_presets_warning = load_prompt_presets(correction_dir)
+
+    default_system_preset = pick_default_preset(system_presets, default_system_file)
+    default_initial_preset = pick_default_preset(initial_presets, default_initial_file)
+    default_correction_preset = pick_default_preset(correction_presets, default_correction_file)
     provider_ids = list(providers.keys())
     default_provider_id = defaults.get("provider", provider_ids[0] if provider_ids else "")
     if default_provider_id not in providers and provider_ids:
@@ -390,27 +605,52 @@ def render() -> None:
             effective_model = model_input.strip() or model_from_list or provider_default_model
             effective_reasoning_effort = reasoning_effort_input
 
-            st.caption(f"Reasoning effort: {reasoning_effort_input}")
-
         st.divider()
         st.markdown("#### System Prompt")
+
+        system_options = [p["filename"] for p in system_presets]
+        default_system_index = (
+            system_options.index(default_system_preset["filename"])
+            if (default_system_preset and default_system_preset["filename"] in system_options)
+            else 0
+        )
+        selected_system_file = st.selectbox(
+            "System Prompt Preset",
+            options=system_options,
+            index=default_system_index,
+            format_func=lambda fn: next((p["title"] for p in system_presets if p["filename"] == fn), fn),
+            disabled=ui_locked or not system_options,
+        ) if system_options else ""
+
+        selected_system_preset = next((p for p in system_presets if p["filename"] == selected_system_file), None)
+        selected_system_content = selected_system_preset["content"] if selected_system_preset else ""
+        selected_system_description = selected_system_preset["description"] if selected_system_preset else ""
+
+        if selected_system_description:
+            st.caption(selected_system_description)
 
         system_prompt_override = st.text_area(
             "System Prompt Override (optional)",
             value="",
-            placeholder="Leave empty to use system_prompt.txt",
+            placeholder="Leave empty to use selected system preset",
             height=180,
             disabled=ui_locked,
         )
-        effective_system_prompt = system_prompt_override.strip() or file_prompt
+        effective_system_prompt = system_prompt_override.strip() or selected_system_content or file_prompt
 
-        if prompt_error:
+        if system_presets_warning:
+            st.warning(system_presets_warning)
+        if prompt_error and not selected_system_content:
             st.warning(prompt_error)
-        else:
-            st.caption("Loaded default system prompt from `system_prompt.txt`.")
+
+        if selected_system_content:
+            st.caption(f"Loaded system prompt preset from `{system_dir}/{selected_system_file}`")
+        elif not prompt_error:
+            st.caption("Loaded fallback default system prompt from `system_prompt.txt`.")
 
         st.caption(
-            f"System prompt in use: {'Sidebar override' if system_prompt_override.strip() else 'system_prompt.txt'}"
+            "System prompt in use: "
+            f"{'Sidebar override' if system_prompt_override.strip() else ('Selected preset' if selected_system_content else 'system_prompt.txt fallback')}"
         )
 
     left_col, right_col = st.columns([1, 1.2], gap="large")
@@ -418,20 +658,69 @@ def render() -> None:
     with left_col:
         st.subheader("Phase 1 · Initial Analysis")
         original_image = st.file_uploader(
-            "Original Reference Image",
-            type=["png", "jpg", "jpeg", "webp"],
+            "Original Reference Media (image/video)",
+            type=SUPPORTED_MEDIA_TYPES,
             key="original_image",
             disabled=ui_locked,
         )
+        st.caption(
+            "Allowed formats: image (PNG/JPG/JPEG/WEBP) or video (MP4 only). "
+            f"App-enforced video limit: {MAX_VIDEO_UPLOAD_MB} MB. "
+            "Image size follows provider/endpoint limits."
+        )
+        phase1_media_error = validate_media_size(original_image)
+        if phase1_media_error:
+            st.error(phase1_media_error)
         if original_image is not None:
-            st.image(original_image, caption="Original image preview", width="stretch")
+            if get_media_kind(original_image) == "video":
+                st.video(original_image)
+            else:
+                st.image(original_image, caption="Original image preview", width="stretch")
+        initial_options = [p["filename"] for p in initial_presets]
+        default_initial_index = (
+            initial_options.index(default_initial_preset["filename"])
+            if (default_initial_preset and default_initial_preset["filename"] in initial_options)
+            else 0
+        )
+        initial_preset_col, initial_load_col = st.columns([5, 1.25], gap="small")
+        with initial_preset_col:
+            selected_initial_file = st.selectbox(
+                "Initial Prompt Preset",
+                options=initial_options,
+                index=default_initial_index,
+                format_func=lambda fn: next((p["title"] for p in initial_presets if p["filename"] == fn), fn),
+                disabled=ui_locked or not initial_options,
+            ) if initial_options else ""
+        selected_initial_preset = next((p for p in initial_presets if p["filename"] == selected_initial_file), None)
+        selected_initial_content = selected_initial_preset["content"] if selected_initial_preset else ""
+        selected_initial_description = selected_initial_preset["description"] if selected_initial_preset else ""
+        if selected_initial_description:
+            st.caption(selected_initial_description)
+        if initial_presets_warning:
+            st.warning(initial_presets_warning)
+
+        init_textarea_state("initial_prompt_text", "")
+
+        with initial_load_col:
+            st.markdown("<div style='height: 1.9rem;'></div>", unsafe_allow_html=True)
+            load_initial_clicked = st.button(
+                "Load",
+                key="load_initial_preset",
+                disabled=ui_locked or not initial_options,
+                help="Load selected preset into the Initial Prompt text box.",
+                width="stretch",
+            )
+        if load_initial_clicked:
+            st.session_state["initial_prompt_text"] = selected_initial_content or DEFAULT_INITIAL_PROMPT
+
         initial_prompt = st.text_area(
             "Initial Prompt",
-            key="initial_prompt",
-            value="Analyze this reference image in highly detailed technical and creative terms.",
+            key="initial_prompt_text",
             height=140,
             disabled=ui_locked,
         )
+
+        effective_initial_prompt = initial_prompt
 
         phase1_meta_preview, phase1_payload_preview = build_phase1_transparency_preview(
             provider_label=str(selected_provider_label),
@@ -439,8 +728,8 @@ def render() -> None:
             model=effective_model,
             reasoning=effective_reasoning_effort,
             system_prompt=effective_system_prompt,
-            initial_prompt=initial_prompt,
-            has_reference_image=original_image is not None,
+            initial_prompt=effective_initial_prompt,
+            reference_media_kind=get_media_kind(original_image),
         )
         render_transparency_block(
             phase1_meta_preview,
@@ -452,16 +741,41 @@ def render() -> None:
 
     with right_col:
         st.subheader("Phase 1 Output")
+        phase1_highlight_enabled = st.checkbox(
+            "Highlight POS (EN only): verbs / adjectives / nouns",
+            key="phase1_pos_highlight",
+            value=False,
+        )
+        phase1_pos_options = {
+            "Verb": "VERB",
+            "Adjective": "ADJ",
+            "Noun": "NOUN",
+        }
+        phase1_selected_labels = st.multiselect(
+            "POS types to highlight",
+            options=list(phase1_pos_options.keys()),
+            default=list(phase1_pos_options.keys()),
+            key="phase1_pos_types",
+            disabled=not phase1_highlight_enabled,
+        )
+        phase1_selected_tags = {phase1_pos_options[label] for label in phase1_selected_labels}
         phase1_thought_expander = st.expander("Thought Process", expanded=True)
         phase1_thought_placeholder = phase1_thought_expander.empty()
         phase1_answer_placeholder = st.empty()
+        phase1_pos_note_placeholder = st.empty()
         phase1_usage_placeholder = st.empty()
         phase1_copy_placeholder = st.empty()
 
         if st.session_state[PHASE1_REASONING]:
             phase1_thought_placeholder.markdown(st.session_state[PHASE1_REASONING])
         if st.session_state[PHASE1_OUTPUT]:
-            phase1_answer_placeholder.markdown(st.session_state[PHASE1_OUTPUT])
+            render_answer_with_optional_pos_highlight(
+                phase1_answer_placeholder,
+                phase1_pos_note_placeholder,
+                st.session_state[PHASE1_OUTPUT],
+                phase1_highlight_enabled,
+                phase1_selected_tags,
+            )
             render_usage(st.session_state[PHASE1_USAGE], phase1_usage_placeholder)
             with phase1_copy_placeholder.container():
                 render_copy_button(
@@ -478,7 +792,9 @@ def render() -> None:
             st.error("Please provide a model name.")
             return
         if original_image is None:
-            st.error("Please upload an original reference image.")
+            st.error("Please upload an original reference media file.")
+            return
+        if phase1_media_error:
             return
 
         st.session_state[LAST_ERROR] = ""
@@ -492,13 +808,13 @@ def render() -> None:
         if effective_system_prompt.strip():
             messages.append({"role": "system", "content": effective_system_prompt.strip()})
 
-        initial_user_text = initial_prompt.strip()
+        initial_user_text = effective_initial_prompt.strip()
 
         initial_user_message = make_user_message(original_image, initial_user_text)
         messages.append(initial_user_message)
 
         try:
-            with st.spinner("Analyzing image..."):
+            with st.spinner("Analyzing media..."):
                 answer, thought, usage, prefer_responses_api = stream_response(
                     client,
                     effective_model,
@@ -510,6 +826,13 @@ def render() -> None:
                 )
             st.session_state[PREFER_RESPONSES_API] = prefer_responses_api
             render_usage(usage, phase1_usage_placeholder)
+            render_answer_with_optional_pos_highlight(
+                phase1_answer_placeholder,
+                phase1_pos_note_placeholder,
+                answer,
+                phase1_highlight_enabled,
+                phase1_selected_tags,
+            )
             with phase1_copy_placeholder.container():
                 render_copy_button("Copy Output (plain text)", answer, key="phase1_copy_button")
 
@@ -538,21 +861,74 @@ def render() -> None:
         with corr_left:
             st.subheader("Phase 2 · Correction Flow")
             correction_image = st.file_uploader(
-                "Upload the generated/incorrect image",
-                type=["png", "jpg", "jpeg", "webp"],
+                "Upload the generated/incorrect media (image/video)",
+                type=SUPPORTED_MEDIA_TYPES,
                 key="correction_image",
                 disabled=ui_locked,
             )
+            st.caption(
+                "Allowed formats: image (PNG/JPG/JPEG/WEBP) or video (MP4 only). "
+                f"App-enforced video limit: {MAX_VIDEO_UPLOAD_MB} MB. "
+                "Image size follows provider/endpoint limits."
+            )
+            phase2_media_error = validate_media_size(correction_image)
+            if phase2_media_error:
+                st.error(phase2_media_error)
             if correction_image is not None:
-                st.image(correction_image, caption="Correction image preview", width="stretch")
+                if get_media_kind(correction_image) == "video":
+                    st.video(correction_image)
+                else:
+                    st.image(correction_image, caption="Correction image preview", width="stretch")
+
+            correction_options = [p["filename"] for p in correction_presets]
+            default_correction_index = (
+                correction_options.index(default_correction_preset["filename"])
+                if (default_correction_preset and default_correction_preset["filename"] in correction_options)
+                else 0
+            )
+            correction_preset_col, correction_load_col = st.columns([5, 1.25], gap="small")
+            with correction_preset_col:
+                selected_correction_file = st.selectbox(
+                    "Correction Notes Preset",
+                    options=correction_options,
+                    index=default_correction_index,
+                    format_func=lambda fn: next((p["title"] for p in correction_presets if p["filename"] == fn), fn),
+                    disabled=ui_locked or not correction_options,
+                ) if correction_options else ""
+            selected_correction_preset = next(
+                (p for p in correction_presets if p["filename"] == selected_correction_file),
+                None,
+            )
+            selected_correction_content = selected_correction_preset["content"] if selected_correction_preset else ""
+            selected_correction_description = selected_correction_preset["description"] if selected_correction_preset else ""
+            if selected_correction_description:
+                st.caption(selected_correction_description)
+            if correction_presets_warning:
+                st.warning(correction_presets_warning)
+
+            init_textarea_state("correction_notes_text", "")
+
+            with correction_load_col:
+                st.markdown("<div style='height: 1.9rem;'></div>", unsafe_allow_html=True)
+                load_correction_clicked = st.button(
+                    "Load",
+                    key="load_correction_preset",
+                    disabled=ui_locked or not correction_options,
+                    help="Load selected preset into the Correction Notes text box.",
+                    width="stretch",
+                )
+            if load_correction_clicked:
+                st.session_state["correction_notes_text"] = selected_correction_content or DEFAULT_CORRECTION_PROMPT
+
             correction_notes = st.text_area(
-                "Correction Prompt",
-                key="correction_notes",
-                value="Use this new image and correction notes to refine your previous analysis.",
+                "Correction Notes",
+                key="correction_notes_text",
                 placeholder="Describe exactly how the model should correct the prior analysis.",
                 height=120,
                 disabled=ui_locked,
             )
+
+            effective_correction_notes = correction_notes
 
             phase2_meta_preview, phase2_payload_preview = build_phase2_transparency_preview(
                 provider_label=str(selected_provider_label),
@@ -561,8 +937,8 @@ def render() -> None:
                 reasoning=effective_reasoning_effort,
                 system_prompt=effective_system_prompt,
                 phase1_output=st.session_state[PHASE1_OUTPUT],
-                correction_prompt=correction_notes,
-                has_correction_image=correction_image is not None,
+                correction_prompt=effective_correction_notes,
+                correction_media_kind=get_media_kind(correction_image),
             )
             render_transparency_block(
                 phase2_meta_preview,
@@ -574,16 +950,41 @@ def render() -> None:
 
         with corr_right:
             st.subheader("Updated Analysis")
+            phase2_highlight_enabled = st.checkbox(
+                "Highlight POS (EN only): verbs / adjectives / nouns",
+                key="phase2_pos_highlight",
+                value=False,
+            )
+            phase2_pos_options = {
+                "Verb": "VERB",
+                "Adjective": "ADJ",
+                "Noun": "NOUN",
+            }
+            phase2_selected_labels = st.multiselect(
+                "POS types to highlight",
+                options=list(phase2_pos_options.keys()),
+                default=list(phase2_pos_options.keys()),
+                key="phase2_pos_types",
+                disabled=not phase2_highlight_enabled,
+            )
+            phase2_selected_tags = {phase2_pos_options[label] for label in phase2_selected_labels}
             phase2_thought_expander = st.expander("Thought Process", expanded=True)
             phase2_thought_placeholder = phase2_thought_expander.empty()
             phase2_answer_placeholder = st.empty()
+            phase2_pos_note_placeholder = st.empty()
             phase2_usage_placeholder = st.empty()
             phase2_copy_placeholder = st.empty()
 
             if st.session_state[PHASE2_REASONING]:
                 phase2_thought_placeholder.markdown(st.session_state[PHASE2_REASONING])
             if st.session_state[PHASE2_OUTPUT]:
-                phase2_answer_placeholder.markdown(st.session_state[PHASE2_OUTPUT])
+                render_answer_with_optional_pos_highlight(
+                    phase2_answer_placeholder,
+                    phase2_pos_note_placeholder,
+                    st.session_state[PHASE2_OUTPUT],
+                    phase2_highlight_enabled,
+                    phase2_selected_tags,
+                )
                 render_usage(st.session_state[PHASE2_USAGE], phase2_usage_placeholder)
                 with phase2_copy_placeholder.container():
                     render_copy_button(
@@ -600,7 +1001,9 @@ def render() -> None:
                 st.error("Please provide a model name.")
                 return
             if correction_image is None:
-                st.error("Please upload a correction image.")
+                st.error("Please upload a correction media file.")
+                return
+            if phase2_media_error:
                 return
 
             st.session_state[LAST_ERROR] = ""
@@ -611,7 +1014,7 @@ def render() -> None:
         if st.session_state[PENDING_ACTION] == "phase2":
             client = OpenAI(api_key=effective_api_key, base_url=effective_base_url)
 
-            correction_text = correction_notes.strip()
+            correction_text = effective_correction_notes.strip()
 
             correction_user_message = make_user_message(correction_image, correction_text)
 
@@ -631,6 +1034,13 @@ def render() -> None:
                     )
                 st.session_state[PREFER_RESPONSES_API] = prefer_responses_api
                 render_usage(usage, phase2_usage_placeholder)
+                render_answer_with_optional_pos_highlight(
+                    phase2_answer_placeholder,
+                    phase2_pos_note_placeholder,
+                    answer,
+                    phase2_highlight_enabled,
+                    phase2_selected_tags,
+                )
                 with phase2_copy_placeholder.container():
                     render_copy_button(
                         "Copy Updated Analysis (plain text)",

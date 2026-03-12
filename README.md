@@ -6,8 +6,6 @@
 
 **FrameLab** is a lightweight, multimodal AI analysis workbench designed for cinematic media. Whether you're analyzing composition, lighting, or technical optics, FrameLab provides a streamlined interface to get deep insights from your images and videos.
 
-FrameLab is currently stable and aligned with its original product intent/goal.
-
 > [!IMPORTANT]
 > **Vibecoding Disclaimer**: This project is built using an AI-assisted "vibecoding" approach (rapid iteration with human supervision). It is experimental, may contain bugs, and could break unintentionally during updates. Use it as a creative tool, but keep your expectations grounded.
 

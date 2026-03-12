@@ -13,7 +13,10 @@ FrameLab is a lightweight multimodal AI web app for cinematic image analysis. It
 - Provider/model/endpoint presets from `config.toml`
 - Sidebar override support for endpoint/model
 - API key resolution order: sidebar → provider env key → `LLM_API_KEY` → legacy fallback
-- Externalized default system prompt via `system_prompt.txt`
+- Folder-based prompt presets for system/initial/correction prompts
+- Optional per-preset metadata via `.meta.toml` (title/description/order)
+- Config-driven default preset selection via `config.toml` (`[prompts]`)
+- Sidebar/manual override precedence over selected presets
 - Uploaded image previews for both Phase 1 and Phase 2
 - Real-time streaming output in UI
 - Thought/reasoning stream shown in **Thought Process** expander
@@ -98,7 +101,19 @@ uv run run.py
   - Default selected value on app load: `low`
   - Selected value is sent as-is to request reasoning effort settings
 - **System Prompt Override (optional)**:
-  - If empty, app uses default prompt content from `system_prompt.txt`
+  - Select preset from dropdown (loaded from configured prompt folder)
+  - If empty override, app uses selected preset content
+  - If preset is unavailable, app falls back to `system_prompt.txt`
+
+- **Initial Prompt Preset + Editable Textbox**:
+  - Select a preset, then click **Load Initial Preset**
+  - The loaded content is shown in the editable **Initial Prompt** textbox
+  - You can review and modify the text before Analyze
+
+- **Correction Notes Preset + Editable Textbox**:
+  - Select a preset, then click **Load Correction Preset**
+  - The loaded content is shown in the editable **Correction Notes** textbox
+  - You can review and modify the text before Submit Correction
 
 ### 2) Phase 1 — Initial Analysis
 
@@ -141,6 +156,18 @@ Each transparency block uses the native expander toggle only (cleaner UI, no ext
 
 ## Message / State Behavior
 
+Prompt behavior:
+
+1. **System prompt** precedence:
+   - Manual sidebar override textarea (if non-empty)
+   - Selected preset file content (`.txt`)
+   - Config default preset selection (`[prompts]` in `config.toml`, by filename)
+   - Built-in fallback (`system_prompt.txt`)
+2. **Initial prompt** and **Correction notes**:
+   - Main source is the editable textbox
+   - Preset dropdown acts as a loader source via **Load Preset** button
+   - Textbox is seeded once from config default preset on first load
+
 Correction flow follows this payload order:
 
 1. `system` prompt (if provided)
@@ -156,6 +183,91 @@ This conversation is persisted in `st.session_state`:
 - `phase1_usage`
 - `phase2_output`, `phase2_reasoning`
 - `phase2_usage`
+
+---
+
+## Custom Prompt Presets
+
+You can add your own prompt templates for all three prompt types.
+
+### 1) Folder structure
+
+- System prompts: `prompts/system/`
+- Initial prompts: `prompts/initial/`
+- Correction prompts: `prompts/correction/`
+
+Each preset is a plain `.txt` file.
+
+Example:
+
+```text
+prompts/system/product_photo_critic.txt
+prompts/initial/quick_scene_summary.txt
+prompts/correction/fix_lighting_focus.txt
+```
+
+### 2) Optional metadata (`.meta.toml`)
+
+To improve dropdown labels and descriptions in UI, add a sidecar metadata file with the same base name:
+
+```text
+prompts/system/product_photo_critic.meta.toml
+```
+
+Example metadata:
+
+```toml
+title = "Product Photo Critic"
+description = "Focuses on commercial product imaging quality, styling, and lighting consistency."
+order = 20
+```
+
+Fields:
+- `title` (optional): display name in dropdown
+- `description` (optional): helper text below preset selector
+- `order` (optional): sort priority (lower appears first)
+
+If metadata is missing, the app uses filename-based labels.
+
+### 3) Set defaults in `config.toml`
+
+Configure preset directories and default files in `[prompts]`:
+
+```toml
+[prompts]
+system_dir = "prompts/system"
+initial_dir = "prompts/initial"
+correction_dir = "prompts/correction"
+default_system = "cinematic_analysis.txt"
+default_initial = "detailed_technical_creative.txt"
+default_correction = "refine_with_correction_image.txt"
+```
+
+`default_*` values must match exact filenames inside each folder.
+
+### 4) Runtime behavior
+
+- **System prompt**:
+  1. Sidebar override textarea (if not empty)
+  2. Selected system preset content
+  3. Config default system preset selection
+  4. `system_prompt.txt` fallback
+
+- **Initial prompt** and **Correction notes**:
+  - Main source is editable textbox
+  - Preset dropdown + **Load** button injects template into textbox
+  - Selecting dropdown alone does not overwrite textbox
+
+### 5) Quick workflow to add a custom preset
+
+1. Add new `.txt` file in the target folder.
+2. (Optional) Add `.meta.toml` for title/description/order.
+3. (Optional) Set it as default in `config.toml` (`default_system`, `default_initial`, or `default_correction`).
+4. Restart app:
+
+```bash
+uv run run.py
+```
 
 ---
 
@@ -210,11 +322,19 @@ This conversation is persisted in `st.session_state`:
 - `app_state.py` — session-state keys and initialization
 - `conversation.py` — multimodal message construction/conversion helpers
 - `llm_streaming.py` — streaming transport/delta parsing/fallback flow
-- `config.toml` — provider presets and default endpoint/model configuration
-- `system_prompt.txt` — default system prompt content
+- `config.toml` — provider presets + prompt preset directories/defaults (`[prompts]`)
+- `prompts/system/*.txt` — system prompt presets
+- `prompts/initial/*.txt` — initial prompt presets
+- `prompts/correction/*.txt` — correction note presets
+- `*.meta.toml` (optional sidecar per preset) — UI metadata (`title`, `description`, `order`)
+- `system_prompt.txt` — legacy fallback system prompt content
 - `.env.example` — sample env variable template
 - `pyproject.toml` — minimal dependencies
 - `AGENTS.md` — contributor/iteration guide for future changes
+
+
+
+
 
 
 

@@ -4,6 +4,7 @@ import json
 import sys
 import tomllib
 import html as html_lib
+from pathlib import Path
 from typing import Tuple
 
 import streamlit as st
@@ -34,10 +35,20 @@ DEFAULT_APP_CONFIG = {
         "provider": "",
         "reasoning_effort": "low",
     },
+    "prompts": {
+        "system_dir": "prompts/system",
+        "initial_dir": "prompts/initial",
+        "correction_dir": "prompts/correction",
+        "default_system": "",
+        "default_initial": "",
+        "default_correction": "",
+    },
     "providers": {},
 }
 
 TRANSPARENCY_PREVIEW_WORDS = 30
+DEFAULT_INITIAL_PROMPT = "Analyze this reference image in highly detailed technical and creative terms."
+DEFAULT_CORRECTION_PROMPT = "Use this new image and correction notes to refine your previous analysis."
 
 
 def render_usage(usage: dict | None, placeholder: st.delta_generator.DeltaGenerator) -> None:
@@ -194,6 +205,72 @@ def load_system_prompt(path: str = "system_prompt.txt") -> Tuple[str, str]:
         return "", f"Failed to read system prompt file ({path}): {exc}"
 
 
+def load_prompt_presets(directory: str) -> tuple[list[dict], str]:
+    directory_path = Path(directory)
+    if not directory_path.exists():
+        return [], f"Prompt preset directory not found: {directory}"
+    if not directory_path.is_dir():
+        return [], f"Prompt preset path is not a directory: {directory}"
+
+    presets: list[dict] = []
+    warnings: list[str] = []
+
+    for txt_path in sorted(directory_path.glob("*.txt")):
+        try:
+            content = txt_path.read_text(encoding="utf-8").strip()
+        except OSError as exc:
+            warnings.append(f"Failed reading preset '{txt_path.name}': {exc}")
+            continue
+
+        meta = {}
+        meta_path = txt_path.with_suffix(".meta.toml")
+        if meta_path.exists():
+            try:
+                with meta_path.open("rb") as f:
+                    parsed = tomllib.load(f)
+                if isinstance(parsed, dict):
+                    meta = parsed
+            except Exception as exc:
+                warnings.append(f"Invalid metadata '{meta_path.name}': {exc}")
+
+        title = str(meta.get("title", "")).strip() or txt_path.stem.replace("_", " ").replace("-", " ").title()
+        description = str(meta.get("description", "")).strip()
+        order = meta.get("order", 1000)
+        try:
+            order = int(order)
+        except Exception:
+            order = 1000
+
+        presets.append(
+            {
+                "filename": txt_path.name,
+                "title": title,
+                "description": description,
+                "content": content,
+                "order": order,
+            }
+        )
+
+    presets.sort(key=lambda p: (p["order"], p["title"].lower(), p["filename"].lower()))
+
+    warning_message = "\n".join(warnings)
+    return presets, warning_message
+
+
+def pick_default_preset(options: list[dict], default_filename: str) -> dict | None:
+    if not options:
+        return None
+    for preset in options:
+        if preset["filename"] == default_filename:
+            return preset
+    return options[0]
+
+
+def init_textarea_state(key: str, initial_value: str) -> None:
+    if key not in st.session_state:
+        st.session_state[key] = initial_value
+
+
 def load_hero(path: str = "hero.md") -> Tuple[str, str]:
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -310,6 +387,23 @@ def render() -> None:
 
     providers = app_config.get("providers", {})
     defaults = app_config.get("defaults", {})
+    prompts_cfg = app_config.get("prompts", {})
+
+    system_dir = str(prompts_cfg.get("system_dir", "prompts/system")).strip() or "prompts/system"
+    initial_dir = str(prompts_cfg.get("initial_dir", "prompts/initial")).strip() or "prompts/initial"
+    correction_dir = str(prompts_cfg.get("correction_dir", "prompts/correction")).strip() or "prompts/correction"
+
+    default_system_file = str(prompts_cfg.get("default_system", "")).strip()
+    default_initial_file = str(prompts_cfg.get("default_initial", "")).strip()
+    default_correction_file = str(prompts_cfg.get("default_correction", "")).strip()
+
+    system_presets, system_presets_warning = load_prompt_presets(system_dir)
+    initial_presets, initial_presets_warning = load_prompt_presets(initial_dir)
+    correction_presets, correction_presets_warning = load_prompt_presets(correction_dir)
+
+    default_system_preset = pick_default_preset(system_presets, default_system_file)
+    default_initial_preset = pick_default_preset(initial_presets, default_initial_file)
+    default_correction_preset = pick_default_preset(correction_presets, default_correction_file)
     provider_ids = list(providers.keys())
     default_provider_id = defaults.get("provider", provider_ids[0] if provider_ids else "")
     if default_provider_id not in providers and provider_ids:
@@ -393,22 +487,49 @@ def render() -> None:
         st.divider()
         st.markdown("#### System Prompt")
 
+        system_options = [p["filename"] for p in system_presets]
+        default_system_index = (
+            system_options.index(default_system_preset["filename"])
+            if (default_system_preset and default_system_preset["filename"] in system_options)
+            else 0
+        )
+        selected_system_file = st.selectbox(
+            "System Prompt Preset",
+            options=system_options,
+            index=default_system_index,
+            format_func=lambda fn: next((p["title"] for p in system_presets if p["filename"] == fn), fn),
+            disabled=ui_locked or not system_options,
+        ) if system_options else ""
+
+        selected_system_preset = next((p for p in system_presets if p["filename"] == selected_system_file), None)
+        selected_system_content = selected_system_preset["content"] if selected_system_preset else ""
+        selected_system_description = selected_system_preset["description"] if selected_system_preset else ""
+
+        if selected_system_description:
+            st.caption(selected_system_description)
+
         system_prompt_override = st.text_area(
             "System Prompt Override (optional)",
             value="",
-            placeholder="Leave empty to use system_prompt.txt",
+            placeholder="Leave empty to use selected system preset",
             height=180,
             disabled=ui_locked,
         )
-        effective_system_prompt = system_prompt_override.strip() or file_prompt
+        effective_system_prompt = system_prompt_override.strip() or selected_system_content or file_prompt
 
-        if prompt_error:
+        if system_presets_warning:
+            st.warning(system_presets_warning)
+        if prompt_error and not selected_system_content:
             st.warning(prompt_error)
-        else:
-            st.caption("Loaded default system prompt from `system_prompt.txt`.")
+
+        if selected_system_content:
+            st.caption(f"Loaded system prompt preset from `{system_dir}/{selected_system_file}`")
+        elif not prompt_error:
+            st.caption("Loaded fallback default system prompt from `system_prompt.txt`.")
 
         st.caption(
-            f"System prompt in use: {'Sidebar override' if system_prompt_override.strip() else 'system_prompt.txt'}"
+            "System prompt in use: "
+            f"{'Sidebar override' if system_prompt_override.strip() else ('Selected preset' if selected_system_content else 'system_prompt.txt fallback')}"
         )
 
     left_col, right_col = st.columns([1, 1.2], gap="large")
@@ -423,13 +544,52 @@ def render() -> None:
         )
         if original_image is not None:
             st.image(original_image, caption="Original image preview", width="stretch")
+        initial_options = [p["filename"] for p in initial_presets]
+        default_initial_index = (
+            initial_options.index(default_initial_preset["filename"])
+            if (default_initial_preset and default_initial_preset["filename"] in initial_options)
+            else 0
+        )
+        initial_preset_col, initial_load_col = st.columns([5, 1.25], gap="small")
+        with initial_preset_col:
+            selected_initial_file = st.selectbox(
+                "Initial Prompt Preset",
+                options=initial_options,
+                index=default_initial_index,
+                format_func=lambda fn: next((p["title"] for p in initial_presets if p["filename"] == fn), fn),
+                disabled=ui_locked or not initial_options,
+            ) if initial_options else ""
+        selected_initial_preset = next((p for p in initial_presets if p["filename"] == selected_initial_file), None)
+        selected_initial_content = selected_initial_preset["content"] if selected_initial_preset else ""
+        selected_initial_description = selected_initial_preset["description"] if selected_initial_preset else ""
+        if selected_initial_description:
+            st.caption(selected_initial_description)
+        if initial_presets_warning:
+            st.warning(initial_presets_warning)
+
+        initial_seed_value = selected_initial_content or DEFAULT_INITIAL_PROMPT
+        init_textarea_state("initial_prompt_text", initial_seed_value)
+
+        with initial_load_col:
+            st.markdown("<div style='height: 1.9rem;'></div>", unsafe_allow_html=True)
+            load_initial_clicked = st.button(
+                "Load",
+                key="load_initial_preset",
+                disabled=ui_locked or not initial_options,
+                help="Load selected preset into the Initial Prompt text box.",
+                width="stretch",
+            )
+        if load_initial_clicked:
+            st.session_state["initial_prompt_text"] = selected_initial_content or DEFAULT_INITIAL_PROMPT
+
         initial_prompt = st.text_area(
             "Initial Prompt",
-            key="initial_prompt",
-            value="Analyze this reference image in highly detailed technical and creative terms.",
+            key="initial_prompt_text",
             height=140,
             disabled=ui_locked,
         )
+
+        effective_initial_prompt = initial_prompt
 
         phase1_meta_preview, phase1_payload_preview = build_phase1_transparency_preview(
             provider_label=str(selected_provider_label),
@@ -437,7 +597,7 @@ def render() -> None:
             model=effective_model,
             reasoning=effective_reasoning_effort,
             system_prompt=effective_system_prompt,
-            initial_prompt=initial_prompt,
+            initial_prompt=effective_initial_prompt,
             has_reference_image=original_image is not None,
         )
         render_transparency_block(
@@ -490,7 +650,7 @@ def render() -> None:
         if effective_system_prompt.strip():
             messages.append({"role": "system", "content": effective_system_prompt.strip()})
 
-        initial_user_text = initial_prompt.strip()
+        initial_user_text = effective_initial_prompt.strip()
 
         initial_user_message = make_user_message(original_image, initial_user_text)
         messages.append(initial_user_message)
@@ -543,14 +703,57 @@ def render() -> None:
             )
             if correction_image is not None:
                 st.image(correction_image, caption="Correction image preview", width="stretch")
+
+            correction_options = [p["filename"] for p in correction_presets]
+            default_correction_index = (
+                correction_options.index(default_correction_preset["filename"])
+                if (default_correction_preset and default_correction_preset["filename"] in correction_options)
+                else 0
+            )
+            correction_preset_col, correction_load_col = st.columns([5, 1.25], gap="small")
+            with correction_preset_col:
+                selected_correction_file = st.selectbox(
+                    "Correction Notes Preset",
+                    options=correction_options,
+                    index=default_correction_index,
+                    format_func=lambda fn: next((p["title"] for p in correction_presets if p["filename"] == fn), fn),
+                    disabled=ui_locked or not correction_options,
+                ) if correction_options else ""
+            selected_correction_preset = next(
+                (p for p in correction_presets if p["filename"] == selected_correction_file),
+                None,
+            )
+            selected_correction_content = selected_correction_preset["content"] if selected_correction_preset else ""
+            selected_correction_description = selected_correction_preset["description"] if selected_correction_preset else ""
+            if selected_correction_description:
+                st.caption(selected_correction_description)
+            if correction_presets_warning:
+                st.warning(correction_presets_warning)
+
+            correction_seed_value = selected_correction_content or DEFAULT_CORRECTION_PROMPT
+            init_textarea_state("correction_notes_text", correction_seed_value)
+
+            with correction_load_col:
+                st.markdown("<div style='height: 1.9rem;'></div>", unsafe_allow_html=True)
+                load_correction_clicked = st.button(
+                    "Load",
+                    key="load_correction_preset",
+                    disabled=ui_locked or not correction_options,
+                    help="Load selected preset into the Correction Notes text box.",
+                    width="stretch",
+                )
+            if load_correction_clicked:
+                st.session_state["correction_notes_text"] = selected_correction_content or DEFAULT_CORRECTION_PROMPT
+
             correction_notes = st.text_area(
-                "Correction Prompt",
-                key="correction_notes",
-                value="Use this new image and correction notes to refine your previous analysis.",
+                "Correction Notes",
+                key="correction_notes_text",
                 placeholder="Describe exactly how the model should correct the prior analysis.",
                 height=120,
                 disabled=ui_locked,
             )
+
+            effective_correction_notes = correction_notes
 
             phase2_meta_preview, phase2_payload_preview = build_phase2_transparency_preview(
                 provider_label=str(selected_provider_label),
@@ -559,7 +762,7 @@ def render() -> None:
                 reasoning=effective_reasoning_effort,
                 system_prompt=effective_system_prompt,
                 phase1_output=st.session_state[PHASE1_OUTPUT],
-                correction_prompt=correction_notes,
+                correction_prompt=effective_correction_notes,
                 has_correction_image=correction_image is not None,
             )
             render_transparency_block(
@@ -609,7 +812,7 @@ def render() -> None:
         if st.session_state[PENDING_ACTION] == "phase2":
             client = OpenAI(api_key=effective_api_key, base_url=effective_base_url)
 
-            correction_text = correction_notes.strip()
+            correction_text = effective_correction_notes.strip()
 
             correction_user_message = make_user_message(correction_image, correction_text)
 

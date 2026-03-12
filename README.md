@@ -1,6 +1,6 @@
 # FrameLab
 
-FrameLab is a lightweight multimodal AI web app for cinematic image analysis. It accepts a reference image with optional context, streams detailed technical breakdowns (covering composition, lighting, and optics), and supports a correction loop where users can submit a new image with notes to refine the analysis. Built with Python + Streamlit + OpenAI SDK, it displays live streaming output, model reasoning/thinking, and token usage while supporting any OpenAI-compatible endpoint.
+FrameLab is a lightweight multimodal AI web app for cinematic media analysis. It accepts a reference image or video with optional context, streams detailed technical breakdowns (covering composition, lighting, and optics), and supports a correction loop where users can submit a new image or MP4 video with notes to refine the analysis. Built with Python + Streamlit + OpenAI SDK, it displays live streaming output, model reasoning/thinking, and token usage while supporting any OpenAI-compatible endpoint.
 
 > **⚙️ Default Configuration**: Provider presets now live in `config.toml` (BytePlus, OpenAI, Gemini, OpenRouter). Update that file to add/edit endpoints and models.
 
@@ -17,7 +17,7 @@ FrameLab is a lightweight multimodal AI web app for cinematic image analysis. It
 - Optional per-preset metadata via `.meta.toml` (title/description/order)
 - Config-driven default preset selection via `config.toml` (`[prompts]`)
 - Sidebar/manual override precedence over selected presets
-- Uploaded image previews for both Phase 1 and Phase 2
+- Uploaded media previews for both Phase 1 and Phase 2 (image or MP4 video)
 - Real-time streaming output in UI
 - Thought/reasoning stream shown in **Thought Process** expander
 - One-click copy buttons for Phase 1 and Phase 2 results (copied as plain text)
@@ -29,8 +29,8 @@ FrameLab is a lightweight multimodal AI web app for cinematic image analysis. It
 - Surfaces underlying exception messages when Responses/fallback fail for easier debugging
 - Auto-disables Responses API for current session when provider reports schema mismatch (e.g. missing `input.status`)
 - Two-phase workflow:
-  - Phase 1: Analyze reference image
-  - Phase 2: Submit correction image + notes
+- Phase 1: Analyze reference media (image/MP4)
+- Phase 2: Submit correction media (image/MP4) + notes
 - Session-based conversation memory (`st.session_state`)
 
 ---
@@ -117,8 +117,8 @@ uv run run.py
 
 ### 2) Phase 1 — Initial Analysis
 
-- Upload **Original Reference Image**
-- Uploaded image is shown as a preview
+- Upload **Original Reference Media** (image or MP4 video)
+- Uploaded media is shown as a preview (`st.image` for images, `st.video` for videos)
 - Add **Additional Context** (optional)
 - Click **Analyze**
 
@@ -139,8 +139,8 @@ The transparency panel now uses thinner text styling and richer visual emphasis 
 
 Appears only after Phase 1 completes.
 
-- Upload **generated/incorrect image**
-- Uploaded correction image is shown as a preview
+- Upload **generated/incorrect media** (image or MP4 video)
+- Uploaded correction media is shown as a preview
 - Add **Correction Notes** (what is wrong)
 - Click **Submit Correction**
 
@@ -285,7 +285,7 @@ uv run run.py
   - Verify API key and endpoint pair (key must match provider).
 
 - **Model not found / unsupported multimodal input**
-  - Ensure selected model supports image inputs at your endpoint.
+  - Ensure selected model supports your selected media type (image/MP4) at your endpoint.
   - App now tries Responses API first and falls back to Chat Completions automatically.
 
 - **Responses API compatibility issues**
@@ -302,8 +302,11 @@ uv run run.py
   - Some providers/models do not return usage in streaming mode.
   - App will show a fallback message when usage metadata is unavailable.
 
-- **Image upload issues**
-  - Supported: `png`, `jpg`, `jpeg`, `webp`.
+- **Media upload issues**
+  - Supported: images (`png`, `jpg`, `jpeg`, `webp`) and video (`mp4` only).
+  - App-level video limit: **20 MB** per MP4 file (in addition to any Streamlit/provider limits).
+  - Image size is not additionally capped by app logic (provider/endpoint limits still apply).
+  - Note: inline base64 payloads increase request size, so larger videos may still fail on some providers/models.
 
 ---
 
@@ -331,6 +334,8 @@ uv run run.py
 - `.env.example` — sample env variable template
 - `pyproject.toml` — minimal dependencies
 - `AGENTS.md` — contributor/iteration guide for future changes
+
+
 
 
 

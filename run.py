@@ -5,7 +5,7 @@ import sys
 import tomllib
 import html as html_lib
 from pathlib import Path
-from typing import Tuple
+from typing import Any, Tuple
 
 import streamlit as st
 from streamlit.components.v1 import html as st_html
@@ -47,6 +47,10 @@ DEFAULT_APP_CONFIG = {
 }
 
 TRANSPARENCY_PREVIEW_WORDS = 30
+MAX_VIDEO_UPLOAD_MB = 20
+SUPPORTED_IMAGE_TYPES = ["png", "jpg", "jpeg", "webp"]
+SUPPORTED_VIDEO_TYPES = ["mp4"]
+SUPPORTED_MEDIA_TYPES = SUPPORTED_IMAGE_TYPES + SUPPORTED_VIDEO_TYPES
 DEFAULT_INITIAL_PROMPT = "Analyze this reference image in highly detailed technical and creative terms."
 DEFAULT_CORRECTION_PROMPT = "Use this new image and correction notes to refine your previous analysis."
 
@@ -94,6 +98,37 @@ def transparency_chip(label: str, color: str, content: str) -> str:
     )
 
 
+def get_media_kind(uploaded_file: Any) -> str:
+    if uploaded_file is None:
+        return "not selected"
+    mime = getattr(uploaded_file, "type", "") or ""
+    return "video" if mime.startswith("video/") else "image"
+
+
+def validate_media_size(uploaded_file: Any, max_video_size_mb: int = MAX_VIDEO_UPLOAD_MB) -> str:
+    if uploaded_file is None:
+        return ""
+
+    if get_media_kind(uploaded_file) != "video":
+        return ""
+
+    max_bytes = max_video_size_mb * 1024 * 1024
+    file_size = getattr(uploaded_file, "size", None)
+    if not isinstance(file_size, int):
+        try:
+            file_size = len(uploaded_file.getvalue())
+        except Exception:
+            file_size = None
+
+    if isinstance(file_size, int) and file_size > max_bytes:
+        actual_mb = file_size / (1024 * 1024)
+        return (
+            f"Uploaded MP4 video is too large ({actual_mb:.1f} MB). "
+            f"Please upload an MP4 up to {max_video_size_mb} MB."
+        )
+    return ""
+
+
 def render_transparency_block(
     metadata: dict[str, str],
     payload_chips: list[str],
@@ -130,7 +165,7 @@ def build_phase1_transparency_preview(
     reasoning: str,
     system_prompt: str,
     initial_prompt: str,
-    has_reference_image: bool,
+    reference_media_kind: str,
 ) -> tuple[dict[str, str], list[str]]:
     initial_user_text = initial_prompt.strip()
     meta = {
@@ -141,7 +176,7 @@ def build_phase1_transparency_preview(
     }
     payload = [
         transparency_chip("system", "#60a5fa", truncate_words(system_prompt)),
-        transparency_chip("reference image", "#f59e0b", "image" if has_reference_image else "not selected"),
+        transparency_chip("reference media", "#f59e0b", reference_media_kind),
         transparency_chip("prompt/context", "#34d399", truncate_words(initial_user_text)),
     ]
     return meta, payload
@@ -155,7 +190,7 @@ def build_phase2_transparency_preview(
     system_prompt: str,
     phase1_output: str,
     correction_prompt: str,
-    has_correction_image: bool,
+    correction_media_kind: str,
 ) -> tuple[dict[str, str], list[str]]:
     correction_text = correction_prompt.strip()
     meta = {
@@ -166,9 +201,9 @@ def build_phase2_transparency_preview(
     }
     payload = [
         transparency_chip("system", "#60a5fa", truncate_words(system_prompt)),
-        transparency_chip("reference image", "#f59e0b", "image"),
+        transparency_chip("reference media", "#f59e0b", "image/video"),
         transparency_chip("previous output", "#a78bfa", truncate_words(phase1_output)),
-        transparency_chip("correction image", "#f59e0b", "image" if has_correction_image else "not selected"),
+        transparency_chip("correction media", "#f59e0b", correction_media_kind),
         transparency_chip("correction notes", "#34d399", truncate_words(correction_text)),
     ]
     return meta, payload
@@ -537,13 +572,24 @@ def render() -> None:
     with left_col:
         st.subheader("Phase 1 · Initial Analysis")
         original_image = st.file_uploader(
-            "Original Reference Image",
-            type=["png", "jpg", "jpeg", "webp"],
+            "Original Reference Media (image/video)",
+            type=SUPPORTED_MEDIA_TYPES,
             key="original_image",
             disabled=ui_locked,
         )
+        st.caption(
+            "Allowed formats: image (PNG/JPG/JPEG/WEBP) or video (MP4 only). "
+            f"App-enforced video limit: {MAX_VIDEO_UPLOAD_MB} MB. "
+            "Image size follows provider/endpoint limits."
+        )
+        phase1_media_error = validate_media_size(original_image)
+        if phase1_media_error:
+            st.error(phase1_media_error)
         if original_image is not None:
-            st.image(original_image, caption="Original image preview", width="stretch")
+            if get_media_kind(original_image) == "video":
+                st.video(original_image)
+            else:
+                st.image(original_image, caption="Original image preview", width="stretch")
         initial_options = [p["filename"] for p in initial_presets]
         default_initial_index = (
             initial_options.index(default_initial_preset["filename"])
@@ -598,7 +644,7 @@ def render() -> None:
             reasoning=effective_reasoning_effort,
             system_prompt=effective_system_prompt,
             initial_prompt=effective_initial_prompt,
-            has_reference_image=original_image is not None,
+            reference_media_kind=get_media_kind(original_image),
         )
         render_transparency_block(
             phase1_meta_preview,
@@ -636,7 +682,9 @@ def render() -> None:
             st.error("Please provide a model name.")
             return
         if original_image is None:
-            st.error("Please upload an original reference image.")
+            st.error("Please upload an original reference media file.")
+            return
+        if phase1_media_error:
             return
 
         st.session_state[LAST_ERROR] = ""
@@ -656,7 +704,7 @@ def render() -> None:
         messages.append(initial_user_message)
 
         try:
-            with st.spinner("Analyzing image..."):
+            with st.spinner("Analyzing media..."):
                 answer, thought, usage, prefer_responses_api = stream_response(
                     client,
                     effective_model,
@@ -696,13 +744,24 @@ def render() -> None:
         with corr_left:
             st.subheader("Phase 2 · Correction Flow")
             correction_image = st.file_uploader(
-                "Upload the generated/incorrect image",
-                type=["png", "jpg", "jpeg", "webp"],
+                "Upload the generated/incorrect media (image/video)",
+                type=SUPPORTED_MEDIA_TYPES,
                 key="correction_image",
                 disabled=ui_locked,
             )
+            st.caption(
+                "Allowed formats: image (PNG/JPG/JPEG/WEBP) or video (MP4 only). "
+                f"App-enforced video limit: {MAX_VIDEO_UPLOAD_MB} MB. "
+                "Image size follows provider/endpoint limits."
+            )
+            phase2_media_error = validate_media_size(correction_image)
+            if phase2_media_error:
+                st.error(phase2_media_error)
             if correction_image is not None:
-                st.image(correction_image, caption="Correction image preview", width="stretch")
+                if get_media_kind(correction_image) == "video":
+                    st.video(correction_image)
+                else:
+                    st.image(correction_image, caption="Correction image preview", width="stretch")
 
             correction_options = [p["filename"] for p in correction_presets]
             default_correction_index = (
@@ -763,7 +822,7 @@ def render() -> None:
                 system_prompt=effective_system_prompt,
                 phase1_output=st.session_state[PHASE1_OUTPUT],
                 correction_prompt=effective_correction_notes,
-                has_correction_image=correction_image is not None,
+                correction_media_kind=get_media_kind(correction_image),
             )
             render_transparency_block(
                 phase2_meta_preview,
@@ -801,7 +860,9 @@ def render() -> None:
                 st.error("Please provide a model name.")
                 return
             if correction_image is None:
-                st.error("Please upload a correction image.")
+                st.error("Please upload a correction media file.")
+                return
+            if phase2_media_error:
                 return
 
             st.session_state[LAST_ERROR] = ""

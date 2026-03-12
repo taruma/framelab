@@ -15,7 +15,12 @@ def make_user_message(image_file: Any, text: str) -> dict[str, Any]:
     if text.strip():
         content.append({"type": "text", "text": text.strip()})
     if image_file is not None:
-        content.append({"type": "image_url", "image_url": {"url": to_data_url(image_file)}})
+        media_mime = image_file.type or mimetypes.guess_type(image_file.name)[0] or ""
+        media_url = to_data_url(image_file)
+        if media_mime.startswith("video/"):
+            content.append({"type": "video_url", "video_url": {"url": media_url}})
+        else:
+            content.append({"type": "image_url", "image_url": {"url": media_url}})
     if not content:
         content.append({"type": "text", "text": "No extra text provided."})
     return {"role": "user", "content": content}
@@ -52,6 +57,13 @@ def messages_to_responses_input(messages: list[dict[str, Any]]) -> list[dict[str
                         image_url = image_obj.get("url")
                         if image_url:
                             converted_content.append({"type": "input_image", "image_url": image_url})
+
+                elif item_type == "video_url":
+                    video_obj = item.get("video_url")
+                    if isinstance(video_obj, dict):
+                        video_url = video_obj.get("url")
+                        if video_url:
+                            converted_content.append({"type": "input_video", "video_url": video_url})
 
         if not converted_content and role != "assistant":
             converted_content = [{"type": "input_text", "text": "No content provided."}]

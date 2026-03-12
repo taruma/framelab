@@ -166,7 +166,7 @@ Prompt behavior:
 2. **Initial prompt** and **Correction notes**:
    - Main source is the editable textbox
    - Preset dropdown acts as a loader source via **Load Preset** button
-   - Textbox is seeded once from config default preset on first load
+   - Textbox starts empty on first load; use **Load** to insert selected preset text
 
 Correction flow follows this payload order:
 
@@ -202,7 +202,9 @@ Example:
 
 ```text
 prompts/system/product_photo_critic.txt
+prompts/system/helpful_assistant.txt
 prompts/initial/quick_scene_summary.txt
+prompts/initial/video_technical_hybrid_script.txt
 prompts/correction/fix_lighting_focus.txt
 ```
 
@@ -334,6 +336,8 @@ uv run run.py
 - `.env.example` — sample env variable template
 - `pyproject.toml` — minimal dependencies
 - `AGENTS.md` — contributor/iteration guide for future changes
+
+
 
 
 

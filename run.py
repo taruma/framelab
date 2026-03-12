@@ -613,8 +613,7 @@ def render() -> None:
         if initial_presets_warning:
             st.warning(initial_presets_warning)
 
-        initial_seed_value = selected_initial_content or DEFAULT_INITIAL_PROMPT
-        init_textarea_state("initial_prompt_text", initial_seed_value)
+        init_textarea_state("initial_prompt_text", "")
 
         with initial_load_col:
             st.markdown("<div style='height: 1.9rem;'></div>", unsafe_allow_html=True)
@@ -789,8 +788,7 @@ def render() -> None:
             if correction_presets_warning:
                 st.warning(correction_presets_warning)
 
-            correction_seed_value = selected_correction_content or DEFAULT_CORRECTION_PROMPT
-            init_textarea_state("correction_notes_text", correction_seed_value)
+            init_textarea_state("correction_notes_text", "")
 
             with correction_load_col:
                 st.markdown("<div style='height: 1.9rem;'></div>", unsafe_allow_html=True)

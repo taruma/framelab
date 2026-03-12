@@ -128,7 +128,8 @@ When making changes:
 4. Ensure failures surface as clear `st.error(...)` messages.
 5. Validate boot flow still works with `uv run run.py`.
 6. Update `README.md` whenever behavior or setup changes.
-7. Ignore `uv.lock` for version/changelog tasks in this repository:
+7. Keep deep technical/runtime details in `docs/REFERENCE.md`; keep `README.md` concise and user-facing.
+8. Ignore `uv.lock` for version/changelog tasks in this repository:
    - `uv.lock` is intentionally untracked/ignored.
    - Do not read, modify, or rely on `uv.lock` when bumping versions.
    - Use tracked files (e.g., `pyproject.toml`) and git commit history as source of truth.

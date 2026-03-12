@@ -390,8 +390,6 @@ def render() -> None:
             effective_model = model_input.strip() or model_from_list or provider_default_model
             effective_reasoning_effort = reasoning_effort_input
 
-            st.caption(f"Reasoning effort: {reasoning_effort_input}")
-
         st.divider()
         st.markdown("#### System Prompt")
 

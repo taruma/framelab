@@ -154,9 +154,9 @@ Config defaults live in `[prompts]` in `config.toml`:
 system_dir = "prompts/system"
 initial_dir = "prompts/initial"
 correction_dir = "prompts/correction"
-default_system = "helpful_assistant.txt"
-default_initial = "detailed_technical_creative.txt"
-default_correction = "refine_with_correction_image.txt"
+default_system = "02_general_assist.txt"
+default_initial = "10_image_deepdive.txt"
+default_correction = "10_refine_with_image.txt"
 ```
 
 ---

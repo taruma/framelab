@@ -25,7 +25,8 @@ https://github.com/user-attachments/assets/5dd8a80b-d9d8-4150-a4a5-7bdca75738cc
 ## 🚀 Key Features
 
 ### 🎬 Multimodal Analysis
-- **Image & Video Support**: Analyze images (PNG, JPG, WEBP) or MP4 videos up to 20MB.
+- **Optional Media Input**: Use FrameLab as text-only chat, or attach images/videos for multimodal analysis.
+- **Image & Video Support**: Analyze images (PNG, JPG, WEBP) or MP4 videos up to 30MB.
 - **Two-Phase Workflow**: Start with an initial analysis and refine it with an optional correction loop.
 - **Cinematic Presets**: Built-in system prompts for film directors, script architects, and image critics.
 
@@ -80,10 +81,10 @@ FrameLab uses `uv` for fast dependency and runtime management.
 Configure your model settings in the sidebar. You can select from pre-configured **Providers** or manually override the API Key, Endpoint, and Model name.
 
 ### Step 2: Phase 1 — Initial Analysis
-Upload your **Original Reference Media**, select an **Initial Prompt** (or write your own), and click **Analyze**. FrameLab will stream a detailed technical breakdown.
+Optionally upload **Original Reference Media**, then select an **Initial Prompt** (or write your own), and click **Analyze**. You can run fully text-only (chat-style) or multimodal with media attached.
 
 ### Step 3: Phase 2 — Correction Loop (Optional)
-If the analysis needs tweaking, upload a **Correction Image/Video** and provide **Correction Notes**. This sends the original context, the first answer, and your new media back to the model for a refined result.
+If the analysis needs tweaking, provide **Correction Notes** and optionally upload a **Correction Image/Video**. This sends the original context, the first answer, and your correction input (text-only or with media) back to the model for a refined result.
 
 ---
 
@@ -178,6 +179,7 @@ For technical/runtime details and behavior contracts, see [`docs/REFERENCE.md`](
 ---
 
 Built with ❤️ by **Taruma Sakti** · Vibecoding with GPT-5.3-Codex
+
 
 
 

@@ -25,7 +25,7 @@ def test_phase2_sections_visible_after_phase1_done_state() -> None:
     assert "Updated Analysis" in subheaders
 
 
-def test_analyze_without_media_shows_error() -> None:
+def test_analyze_without_media_does_not_require_upload() -> None:
     app = AppTest.from_file("run.py")
     app.run(timeout=20)
 
@@ -33,12 +33,4 @@ def test_analyze_without_media_shows_error() -> None:
     app.button[1].click().run(timeout=20)
 
     errors = [e.value for e in app.error]
-    expected_error_fragments = [
-        "Please upload an original reference media file.",
-        "Please provide an API key",
-        "Please provide a model name.",
-    ]
-    assert any(
-        any(fragment in err for fragment in expected_error_fragments)
-        for err in errors
-    )
+    assert all("Please upload an original reference media file." not in err for err in errors)

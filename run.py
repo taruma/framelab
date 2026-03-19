@@ -356,7 +356,7 @@ def build_phase2_transparency_preview(
     }
     payload = [
         transparency_chip("system", "#60a5fa", truncate_words(system_prompt)),
-        transparency_chip("reference media", "#f59e0b", "image/video"),
+        transparency_chip("reference context", "#f59e0b", "image/video/text"),
         transparency_chip("previous output", "#a78bfa", truncate_words(phase1_output)),
         transparency_chip("correction media", "#f59e0b", correction_media_kind),
         transparency_chip("correction notes", "#34d399", truncate_words(correction_text)),
@@ -767,12 +767,13 @@ def render() -> None:
     with left_col:
         st.subheader("Phase 1 · Initial Analysis")
         original_image = st.file_uploader(
-            "Original Reference Media (image/video)",
+            "Original Reference Media (image/video, optional)",
             type=SUPPORTED_MEDIA_TYPES,
             key="original_image",
             disabled=ui_locked,
         )
         st.caption(
+            "Optional upload: you can use text-only chat mode, or include media for multimodal analysis. "
             "Allowed formats: image (PNG/JPG/JPEG/WEBP) or video (MP4 only). "
             f"App-enforced video limit: {MAX_VIDEO_UPLOAD_MB} MB. "
             "Image size follows provider/endpoint limits."
@@ -900,9 +901,6 @@ def render() -> None:
         if not effective_model:
             st.error("Please provide a model name.")
             return
-        if original_image is None:
-            st.error("Please upload an original reference media file.")
-            return
         if phase1_media_error:
             return
 
@@ -923,7 +921,7 @@ def render() -> None:
         messages.append(initial_user_message)
 
         try:
-            with st.spinner("Analyzing media..."):
+            with st.spinner("Generating response..."):
                 answer, thought, usage, prefer_responses_api = stream_response(
                     client,
                     effective_model,
@@ -970,12 +968,13 @@ def render() -> None:
         with corr_left:
             st.subheader("Phase 2 · Correction Flow")
             correction_image = st.file_uploader(
-                "Upload the generated/incorrect media (image/video)",
+                "Upload the generated/incorrect media (image/video, optional)",
                 type=SUPPORTED_MEDIA_TYPES,
                 key="correction_image",
                 disabled=ui_locked,
             )
             st.caption(
+                "Optional upload: you can submit text-only correction notes, or include media for multimodal refinement. "
                 "Allowed formats: image (PNG/JPG/JPEG/WEBP) or video (MP4 only). "
                 f"App-enforced video limit: {MAX_VIDEO_UPLOAD_MB} MB. "
                 "Image size follows provider/endpoint limits."
@@ -1108,9 +1107,6 @@ def render() -> None:
                 return
             if not effective_model:
                 st.error("Please provide a model name.")
-                return
-            if correction_image is None:
-                st.error("Please upload a correction media file.")
                 return
             if phase2_media_error:
                 return

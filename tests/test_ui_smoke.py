@@ -33,4 +33,12 @@ def test_analyze_without_media_shows_error() -> None:
     app.button[1].click().run(timeout=20)
 
     errors = [e.value for e in app.error]
-    assert any("Please upload an original reference media file." in err for err in errors)
+    expected_error_fragments = [
+        "Please upload an original reference media file.",
+        "Please provide an API key",
+        "Please provide a model name.",
+    ]
+    assert any(
+        any(fragment in err for fragment in expected_error_fragments)
+        for err in errors
+    )

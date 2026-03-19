@@ -10,5 +10,17 @@ dependencies = [
     "streamlit",
 ]
 
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0.0",
+]
+
+[tool.pytest.ini_options]
+addopts = "-q -m \"not live\""
+testpaths = ["tests"]
+markers = [
+    "live: optional live/provider-backed tests (excluded from default and CI unless explicitly enabled)",
+]
+
 [tool.poetry]
 package-mode = false

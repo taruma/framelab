@@ -104,6 +104,29 @@ For deeper technical behavior (precedence rules, state contracts, fallback inter
 
 ---
 
+## ✅ Testing
+
+FrameLab includes a lightweight regression test framework to reduce breakage when features evolve.
+
+- Framework overview and architecture: [`docs/TESTING.md`](docs/TESTING.md)
+- Default offline suite (recommended, also used in CI):
+  ```bash
+  uv sync --extra test
+  uv run pytest
+  ```
+- Optional live provider smoke test (local only, explicit opt-in):
+  ```bash
+  # Linux/macOS
+  FRAMELAB_ENABLE_LIVE_TESTS=1 uv run pytest -m live -o addopts="-q"
+
+  # Windows PowerShell
+  $env:FRAMELAB_ENABLE_LIVE_TESTS="1"; uv run pytest -m live -o addopts="-q"
+  ```
+
+By default, test runs are offline (`not live`). Live tests are skipped in CI/cloud and require explicit local opt-in.
+
+---
+
 ## 🔬 Technical Notes
 
 - **API Compatibility**: FrameLab defaults to the `client.responses.create` path. If your provider doesn't support it, the app automatically falls back to standard Chat Completions.
@@ -134,6 +157,8 @@ For technical/runtime details and behavior contracts, see [`docs/REFERENCE.md`](
 ---
 
 Built with ❤️ by **Taruma Sakti** · Vibecoding with GPT-5.3-Codex
+
+
 
 
 

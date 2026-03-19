@@ -51,3 +51,27 @@ base_url = "https://api.xiaomimimo.com/v1"
 default_model = "mimo-v2-omni"
 env_key = "MIMO_API_KEY"
 models = ["mimo-v2-flash", "mimo-v2-omni", "mimo-v2-pro"]
+
+[[notices]]
+enabled = false
+text = "News: Prompt presets for video analysis are now expanded"
+icon = "📰"
+color = "blue"
+
+[[notices]]
+enabled = true
+text = "New Update: Xiaomi provider added; Mimo V2 Omni model now available on OpenRouter"
+icon = ":material/rocket_launch:"
+color = "green"
+
+[[notices]]
+enabled = true
+text = "Reminder: System prompt may not be optimized for the model being used"
+icon = ":material/warning:"
+color = "orange"
+
+[[notices]]
+enabled = false
+text = "Tip: Use prompt presets first, then fine-tune in the text box"
+icon = "💡"
+color = "green"

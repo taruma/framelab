@@ -92,6 +92,29 @@ If the analysis needs tweaking, upload a **Correction Image/Video** and provide 
 ### `config.toml`
 The core of FrameLab's provider system. Edit this file to add new models, change default endpoints, or point to different prompt directories.
 
+You can also show app-level announcement badges (right below hero) by adding `[[notices]]` entries:
+
+```toml
+[[notices]]
+enabled = true
+text = "New: Phase 2 correction supports image + MP4 workflow"
+icon = ":material/rocket_launch:"
+color = "violet"
+
+[[notices]]
+enabled = true
+text = "Heads up: Bring your own API key"
+icon = "⚠️"
+color = "orange"
+```
+
+Notes:
+- `enabled` defaults to `true`
+- `text` (or `label`) is required
+- `color` supports: `blue`, `green`, `orange`, `red`, `violet`, `gray`
+- Invalid/missing color falls back to `gray`
+- Each notice is rendered on its own line and centered below the hero section
+
 ### Prompt Presets
 FrameLab loads templates from the `prompts/` directory. You can add your own `.txt` files to:
 - `prompts/system/` (System roles)
@@ -155,6 +178,8 @@ For technical/runtime details and behavior contracts, see [`docs/REFERENCE.md`](
 ---
 
 Built with ❤️ by **Taruma Sakti** · Vibecoding with GPT-5.3-Codex
+
+
 
 
 

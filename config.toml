@@ -34,9 +34,9 @@ models = ["gemini-3.1-flash-lite-preview", "gemini-3-flash-preview", "gemini-3.1
 [providers.openrouter]
 label = "OpenRouter"
 base_url = "https://openrouter.ai/api/v1"
-default_model = "bytedance-seed/seed-2.0-lite"
+default_model = "xiaomi/mimo-v2-omni"
 env_key = "OPENROUTER_API_KEY"
-models = ["bytedance-seed/seed-2.0-lite", "bytedance-seed/seed-2.0-mini", "qwen/qwen3.5-flash-02-23", "moonshotai/kimi-k2.5", "z-ai/glm-4.6v"]
+models = ["xiaomi/mimo-v2-omni", "bytedance-seed/seed-2.0-lite", "bytedance-seed/seed-2.0-mini"]
 
 [providers.claude]
 label = "Claude (OpenAI-compatible)"

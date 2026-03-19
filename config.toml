@@ -53,13 +53,25 @@ env_key = "MIMO_API_KEY"
 models = ["mimo-v2-flash", "mimo-v2-omni", "mimo-v2-pro"]
 
 [[notices]]
-enabled = true
-text = "New: Phase 2 correction supports image + MP4 workflow"
-icon = ":material/rocket_launch:"
-color = "violet"
+enabled = false
+text = "News: Prompt presets for video analysis are now expanded"
+icon = "📰"
+color = "blue"
 
 [[notices]]
 enabled = true
-text = "Heads up: Bring your own API key (usage is billed by your provider)"
-icon = "⚠️"
+text = "New Update: Xiaomi provider added; Mimo V2 Omni model now available on OpenRouter"
+icon = ":material/rocket_launch:"
+color = "green"
+
+[[notices]]
+enabled = true
+text = "Reminder: System prompt may not be optimized for the model being used"
+icon = ":material/warning:"
 color = "orange"
+
+[[notices]]
+enabled = false
+text = "Tip: Use prompt presets first, then fine-tune in the text box"
+icon = "💡"
+color = "green"

@@ -51,3 +51,15 @@ base_url = "https://api.xiaomimimo.com/v1"
 default_model = "mimo-v2-omni"
 env_key = "MIMO_API_KEY"
 models = ["mimo-v2-flash", "mimo-v2-omni", "mimo-v2-pro"]
+
+[[notices]]
+enabled = true
+text = "New: Phase 2 correction supports image + MP4 workflow"
+icon = ":material/rocket_launch:"
+color = "violet"
+
+[[notices]]
+enabled = true
+text = "Heads up: Bring your own API key (usage is billed by your provider)"
+icon = "⚠️"
+color = "orange"

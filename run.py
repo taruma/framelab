@@ -43,6 +43,7 @@ DEFAULT_APP_CONFIG = {
         "default_initial": "",
         "default_correction": "",
     },
+    "notices": [],
     "providers": {},
 }
 
@@ -53,6 +54,7 @@ SUPPORTED_VIDEO_TYPES = ["mp4"]
 SUPPORTED_MEDIA_TYPES = SUPPORTED_IMAGE_TYPES + SUPPORTED_VIDEO_TYPES
 DEFAULT_INITIAL_PROMPT = "Analyze this reference image in highly detailed technical and creative terms."
 DEFAULT_CORRECTION_PROMPT = "Use this new image and correction notes to refine your previous analysis."
+ALLOWED_BADGE_COLORS = {"blue", "green", "orange", "red", "violet", "gray"}
 
 
 @st.cache_resource
@@ -469,6 +471,38 @@ def load_hero(path: str = "hero.md") -> Tuple[str, str]:
         return "", f"Failed to read hero file ({path}): {exc}"
 
 
+def normalize_notice_color(raw_color: Any) -> str:
+    color = str(raw_color or "").strip().lower()
+    return color if color in ALLOWED_BADGE_COLORS else "gray"
+
+
+def build_notices_markdown_lines(notices: Any) -> list[str]:
+    if not isinstance(notices, list):
+        return []
+
+    badges: list[str] = []
+    for notice in notices:
+        if not isinstance(notice, dict):
+            continue
+
+        enabled = notice.get("enabled", True)
+        if enabled is False:
+            continue
+
+        text = str(notice.get("text", notice.get("label", ""))).strip()
+        if not text:
+            continue
+
+        icon = str(notice.get("icon", "")).strip()
+        color = normalize_notice_color(notice.get("color", "gray"))
+
+        content = f"{icon} {text}".strip() if icon else text
+        safe_content = _escape_streamlit_color_text(content)
+        badges.append(f":{color}-badge[{safe_content}]")
+
+    return badges
+
+
 def load_app_config(path: str = "config.toml") -> tuple[dict, str]:
     try:
         with open(path, "rb") as f:
@@ -571,6 +605,14 @@ def render() -> None:
         st.markdown(hero_content, unsafe_allow_html=True)
     elif hero_error:
         st.warning(hero_error)
+
+    notices_markdown_lines = build_notices_markdown_lines(app_config.get("notices", []))
+    if notices_markdown_lines:
+        _, notices_center_col, _ = st.columns([1, 2.2, 1])
+        with notices_center_col:
+            for notice_line in notices_markdown_lines:
+                st.markdown(notice_line, width="stretch", text_alignment="center")
+
     st.divider()
 
     providers = app_config.get("providers", {})

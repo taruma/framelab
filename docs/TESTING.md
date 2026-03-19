@@ -51,6 +51,7 @@ Goal: keep tests **simple, fast, and useful** for regression safety when adding/
 - Purpose: quick sanity check against a real provider with minimal assertions.
 - Requires explicit opt-in env flag: `FRAMELAB_ENABLE_LIVE_TESTS=1`
 - Auto-skips in CI/cloud environments.
+- Pytest auto-loads local `.env` via `tests/conftest.py`.
 
 ## Provider strategy for live smoke tests
 
@@ -89,16 +90,10 @@ uv run pytest -q -m "not live"
 Run only live smoke (explicit local opt-in):
 
 ```bash
-# Linux/macOS
-FRAMELAB_ENABLE_LIVE_TESTS=1 uv run pytest -m live -o addopts="-q"
-
-# Windows PowerShell
-$env:FRAMELAB_ENABLE_LIVE_TESTS="1"; uv run pytest -m live -o addopts="-q"
+uv run pytest --live
 ```
 
-> Why `-o addopts="-q"` for live runs?
-> Default pytest config enforces offline mode (`-m "not live"`). Overriding `addopts`
-> is the explicit instruction that enables a live run.
+Set `FRAMELAB_ENABLE_LIVE_TESTS=1` in local `.env` (copied from `.env.example`) to enable live execution.
 
 ## Contribution checklist for changes
 

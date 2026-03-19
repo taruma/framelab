@@ -116,12 +116,10 @@ FrameLab includes a lightweight regression test framework to reduce breakage whe
   ```
 - Optional live provider smoke test (local only, explicit opt-in):
   ```bash
-  # Linux/macOS
-  FRAMELAB_ENABLE_LIVE_TESTS=1 uv run pytest -m live -o addopts="-q"
-
-  # Windows PowerShell
-  $env:FRAMELAB_ENABLE_LIVE_TESTS="1"; uv run pytest -m live -o addopts="-q"
+  uv run pytest --live
   ```
+
+Set `FRAMELAB_ENABLE_LIVE_TESTS=1` in local `.env` (see `.env.example`) to enable live execution.
 
 By default, test runs are offline (`not live`). Live tests are skipped in CI/cloud and require explicit local opt-in.
 
@@ -157,6 +155,8 @@ For technical/runtime details and behavior contracts, see [`docs/REFERENCE.md`](
 ---
 
 Built with ❤️ by **Taruma Sakti** · Vibecoding with GPT-5.3-Codex
+
+
 
 
 

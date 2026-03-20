@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Updated workflow terminology to better match current functionality:
+  - Phase 1 now uses **Primary Analysis** wording.
+  - Phase 2 now uses **Refinement Loop** wording.
+  - UI labels and actions now use **Refinement Notes / Run Refinement / Refined Analysis** terminology.
+
+### Documentation
+
+- Updated naming references across `README.md`, `hero.md`, `docs/REFERENCE.md`, and `AGENTS.md` to align with the refinement-loop workflow language.
+
 ## [1.2.1] - 2026-03-13
 
 ### Fixed

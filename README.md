@@ -27,7 +27,7 @@ https://github.com/user-attachments/assets/5dd8a80b-d9d8-4150-a4a5-7bdca75738cc
 ### 🎬 Multimodal Analysis
 - **Optional Media Input**: Use FrameLab as text-only chat, or attach images/videos for multimodal analysis.
 - **Image & Video Support**: Analyze images (PNG, JPG, WEBP) or MP4 videos up to 30MB.
-- **Two-Phase Workflow**: Start with an initial analysis and refine it with an optional correction loop.
+- **Two-Phase Workflow**: Start with a primary analysis and refine it with an optional refinement loop.
 - **Cinematic Presets**: Built-in system prompts for film directors, script architects, and image critics.
 
 ### 🛠️ Developer & Power User Tools
@@ -80,11 +80,11 @@ FrameLab uses `uv` for fast dependency and runtime management.
 ### Step 1: Configuration (Sidebar)
 Configure your model settings in the sidebar. You can select from pre-configured **Providers** or manually override the API Key, Endpoint, and Model name.
 
-### Step 2: Phase 1 — Initial Analysis
+### Step 2: Phase 1 — Primary Analysis
 Optionally upload **Original Reference Media**, then select an **Initial Prompt** (or write your own), and click **Analyze**. You can run fully text-only (chat-style) or multimodal with media attached.
 
-### Step 3: Phase 2 — Correction Loop (Optional)
-If the analysis needs tweaking, provide **Correction Notes** and optionally upload a **Correction Image/Video**. This sends the original context, the first answer, and your correction input (text-only or with media) back to the model for a refined result.
+### Step 3: Phase 2 — Refinement Loop (Optional)
+If the analysis needs refinement, provide **Refinement Notes** and optionally upload a **Refinement Image/Video**. This sends the original context, the first answer, and your refinement input (text-only or with media) back to the model for an improved result.
 
 ---
 
@@ -98,7 +98,7 @@ You can also show app-level announcement badges (right below hero) by adding `[[
 ```toml
 [[notices]]
 enabled = true
-text = "New: Phase 2 correction supports image + MP4 workflow"
+text = "New: Phase 2 refinement supports image + MP4 workflow"
 icon = ":material/rocket_launch:"
 color = "violet"
 
@@ -120,7 +120,7 @@ Notes:
 FrameLab loads templates from the `prompts/` directory. You can add your own `.txt` files to:
 - `prompts/system/` (System roles)
 - `prompts/initial/` (Initial analysis tasks)
-- `prompts/correction/` (Correction instructions)
+- `prompts/correction/` (Refinement instructions)
 
 *(Optional: Add a `.meta.toml` file next to your `.txt` to customize the title and description in the UI.)*
 
@@ -179,6 +179,7 @@ For technical/runtime details and behavior contracts, see [`docs/REFERENCE.md`](
 ---
 
 Built with ❤️ by **Taruma Sakti** · Vibecoding with GPT-5.3-Codex
+
 
 
 

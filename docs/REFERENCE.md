@@ -71,6 +71,13 @@ uv run run.py
 - For multi-media uploads, the main panel uses compact thumbnail previews with tag captions.
 - Full-size preview + tag editing for multi-media is handled in a **Manage media tags** dialog.
 
+### Output editing dialogs
+
+- Both phases support markdown output editing via dialog:
+  - **Edit Phase 1 Output**
+  - **Edit Phase 2 Output**
+- If Phase 1 output is edited by the user, the refinement step uses the edited version as prior assistant context.
+
 ### Right-panel output order (per phase)
 
 1. `Thought Process` expander (when reasoning exists)
@@ -85,6 +92,12 @@ uv run run.py
 - Preview is live-updated from current input state
 - For multiple media items, preview includes media summary + media-tag mapping chip.
 - For single media items, preview keeps legacy compact behavior (kind only).
+
+### Session request logging (optional)
+
+- Request-attempt logging can be enabled per session.
+- Logged attempts can be downloaded as JSON.
+- Media base64 payload is omitted in logs; filenames are preserved for traceability.
 
 ### Multi-media tag persistence
 
@@ -119,6 +132,26 @@ API key resolution order:
 2. Provider env key from `config.toml`
 3. `LLM_API_KEY`
 4. Legacy fallback keys
+
+### Hero notices in `config.toml`
+
+App-level notices below the hero section are configured with `[[notices]]` entries:
+
+```toml
+[[notices]]
+enabled = true
+text = "New: Phase 2 refinement supports image + MP4 workflow"
+icon = ":material/rocket_launch:"
+color = "violet"
+```
+
+Notes:
+
+- `enabled` defaults to `true`
+- `text` (or `label`) is required
+- Supported `color`: `blue`, `green`, `orange`, `red`, `violet`, `gray`
+- Invalid/missing color falls back to `gray`
+- Each notice renders on its own centered line below the hero block
 
 ### Prompt selection precedence
 

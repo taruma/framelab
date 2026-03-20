@@ -26,6 +26,6 @@
         <a href="https://github.com/taruma/framelab" target="_blank" style="color: #4da6ff;">View on GitHub</a> for documentation and setup guide
     </p>
     <p style="font-size: 0.86rem; color: #7c8a9c; margin: 0.65rem 0 0 0;">
-        © 2026 Taruma Sakti · Vibecoding with GPT-5.3-Codex · Built for my AI Filmmaking journey
+        © 2026 Taruma Sakti · Vibecoding with Cline + GPT-5.3-Codex · Built for my AI Filmmaking journey
     </p>
 </div>

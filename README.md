@@ -4,14 +4,8 @@
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square)
 
-**FrameLab** is a lightweight multimodal AI analysis workbench for cinematic media, supporting text-only or image/video workflows, live streaming output, and an iterative refinement loop.
-
-With FrameLab, you can quickly:
-- break down composition, lighting, color, staging, and camera intent from still frames,
-- analyze short video clips for motion, continuity, and sequence-level storytelling,
-- run text-only creative/technical ideation when you don’t want to upload media,
-- iterate on results with refinement notes and optional follow-up media,
-- keep prompts and outputs editable so your workflow stays flexible.
+**FrameLab** is a lightweight multimodal AI app for cinematic analysis.
+Bring text, images, or video, get streamed insights, then refine in a second pass.
 
 🌐 **Use it on the web:** [framelab.streamlit.app](https://framelab.streamlit.app)
 
@@ -29,201 +23,85 @@ https://github.com/user-attachments/assets/5dd8a80b-d9d8-4150-a4a5-7bdca75738cc
 
 ---
 
-## 🚀 Key Features
+## Why people use FrameLab
 
-### 🎯 What You Can Do with FrameLab
-
-- **Cinematic image critique**: Get detailed analysis of framing, lens feel, depth cues, contrast, and art direction signals.
-- **Video shot-level review**: Use MP4 clips to inspect pacing, blocking, transitions, and visual consistency.
-- **Prompt planning for creators**: Turn references into usable shot ideas, direction notes, or production-ready prompt language.
-- **Text-only analysis and brainstorming**: Use it as a pure assistant for concepting, revision strategy, and creative planning.
-- **Iterative refinement loop**: Start with a first pass, then refine with correction notes and additional media while preserving context.
-- **Provider-flexible experimentation**: Switch endpoints/models in the sidebar to compare behavior without changing your workflow.
+- **Text-only or multimodal** workflow (images/videos are optional)
+- **Two-phase flow**: Primary Analysis → Refinement Loop
+- **Live streaming output** with a Thought Process panel when available
+- **Prompt and output editing** directly in the UI
+- **Copy actions** for both plain text and markdown
+- **Provider flexibility** via OpenAI-compatible endpoints
 
 ---
 
-### 🎬 Multimodal Analysis
-- **Optional Media Input**: Use FrameLab as text-only chat, or attach one or more images/videos for multimodal analysis.
-- **Image & Video Support**: Analyze images (PNG, JPG, WEBP) or MP4 videos up to 30MB.
-- **Media Tagging**: Uploaded media gets default aliases (`@image1`, `@image2`, `@video1`, ...), and each tag is editable before sending.
-- **Compact Multi-Media UX**: For multi-media uploads, FrameLab shows compact thumbnails in the main flow and opens a full-size dialog for tag editing.
-- **Two-Phase Workflow**: Start with a primary analysis and refine it with an optional refinement loop.
-- **Cinematic Presets**: Built-in system prompts for film directors, script architects, and image critics.
-- **Prompt-First Workflow**: Every phase prompt is editable, so you can tune behavior without touching code.
+## Quick Start
 
-### 🛠️ Developer & Power User Tools
-- **Responses API Native**: Built to use the latest OpenAI Responses API with automatic fallback to Chat Completions.
-- **Request Transparency**: Peek under the hood with a live-updating payload preview before you send requests.
-- **Session Request Logging (Optional)**: Save request/response attempt logs for the current session and download as JSON (media base64 is omitted; filenames are kept).
-- **Provider Presets**: Easily switch between OpenAI, Gemini, OpenRouter, BytePlus, Claude, Xiaomi, or other OpenAI-compatible endpoints via `config.toml`.
-- **Reasoning Stream**: View the model's "thought process" in real-time for reasoning-capable models.
+FrameLab uses [`uv`](https://docs.astral.sh/uv/) for dependency + runtime management.
 
-### 🎨 UI & Experience
-- **Live Streaming**: Real-time output rendering for immediate feedback.
-- **POS Highlighting**: Optional English Part-of-Speech highlighting (Verbs, Adjectives, Nouns) to help scan technical terminology.
-- **Flexible Copy Actions**: One-click **Copy Plain Text** or **Copy Markdown** actions for each phase output.
-- **Editable Output (Dialog)**: Edit Phase 1 or Phase 2 markdown output in a simple Submit/Cancel dialog, while keeping the main view clean.
-
----
-
-## ⚡ Quick Start
-
-FrameLab uses `uv` for fast dependency and runtime management.
-
-1. **Clone the repo:**
-   ```bash
-   git clone https://github.com/taruma/framelab.git
-   cd framelab
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   uv sync
-   ```
-
-3. **Set up your environment (optional but recommended):**
-   ```bash
-   # Windows (PowerShell / cmd)
-   copy .env.example .env
-
-   # macOS / Linux
-   cp .env.example .env
-   ```
-   Then edit `.env` and add your `LLM_API_KEY`.
-
-4. **Run the app:**
-   ```bash
-   uv run run.py
-   ```
-
----
-
-## 🕹️ How to Use
-
-### Step 1: Configuration (Sidebar)
-Configure your model settings in the sidebar. You can select from pre-configured **Providers** or manually override the API Key, Endpoint, and Model name. The **System Prompt** textbox is directly editable and is the exact source used in requests; the preset dropdown plus **Load** button is a quick way to populate that textbox.
-
-### Step 2: Phase 1 — Primary Analysis
-Optionally upload one or more **Original Reference Media** items, then select an **Initial Prompt** (or write your own), and click **Analyze**. You can run fully text-only (chat-style) or multimodal with media attached. For multi-media uploads, FrameLab shows compact thumbnails in the main panel, and a **Manage media tags** dialog provides full-size previews plus per-item tag editing before submission. After generation, you can click **Edit output** to adjust the markdown result in a dialog.
-
-### Step 3: Phase 2 — Refinement Loop (Optional)
-If the analysis needs refinement, provide **Refinement Notes** and optionally upload one or more **Refinement Image/Video** items. This sends the original context, the first answer, and your refinement input (text-only or with media) back to the model for an improved result. If you edited the Phase 1 output, the refinement step uses that edited text as the prior assistant context.
-
----
-
-## 🧩 Build Your Own Prompt System
-
-FrameLab is designed so you can shape model behavior without forking the codebase.
-
-- **System Prompt is user-controlled**: The sidebar System Prompt textbox is the active request source.
-- **Preset + edit workflow**: Load a preset, then modify it directly for your own style/goal.
-- **Per-phase instruction control**: Initial Prompt and Refinement Notes are both editable on every run.
-- **Reusable custom presets**: Add your own `.txt` files into:
-  - `prompts/system/`
-  - `prompts/initial/`
-  - `prompts/correction/`
-- **Optional preset metadata**: Add `name.meta.toml` sidecars (`title`, `description`, `order`) for cleaner UI labels.
-
-Simple pattern for building your own prompt system:
-1. Start from an existing system preset closest to your target style.
-2. Load it into the System Prompt textbox and customize tone/format/output constraints.
-3. Pair it with a tailored Initial Prompt for first-pass behavior.
-4. Use Refinement Notes templates to enforce your revision loop consistently.
-
----
-
-## ⚙️ Advanced Configuration
-
-### `config.toml`
-The core of FrameLab's provider system. Edit this file to add new models, change default endpoints, or point to different prompt directories.
-
-You can also show app-level announcement badges (right below hero) by adding `[[notices]]` entries:
-
-```toml
-[[notices]]
-enabled = true
-text = "New: Phase 2 refinement supports image + MP4 workflow"
-icon = ":material/rocket_launch:"
-color = "violet"
-
-[[notices]]
-enabled = true
-text = "Heads up: Bring your own API key"
-icon = "⚠️"
-color = "orange"
+```bash
+git clone https://github.com/taruma/framelab.git
+cd framelab
+uv sync
+uv run run.py
 ```
 
-Notes:
-- `enabled` defaults to `true`
-- `text` (or `label`) is required
-- `color` supports: `blue`, `green`, `orange`, `red`, `violet`, `gray`
-- Invalid/missing color falls back to `gray`
-- Each notice is rendered on its own line and centered below the hero section
+Optional (recommended):
 
-### Prompt Presets
-FrameLab loads templates from the `prompts/` directory. You can add your own `.txt` files to:
-- `prompts/system/` (System roles)
-- `prompts/initial/` (Initial analysis tasks)
-- `prompts/correction/` (Refinement instructions)
+```bash
+# Windows
+copy .env.example .env
 
-*(Optional: Add a `.meta.toml` file next to your `.txt` to customize the title and description in the UI.)*
+# macOS / Linux
+cp .env.example .env
+```
 
-For deeper technical behavior (precedence rules, state contracts, fallback internals, troubleshooting), see [`docs/REFERENCE.md`](docs/REFERENCE.md).
+Then add your key to `.env` (for example `LLM_API_KEY=...`) or paste it in the sidebar at runtime.
 
 ---
 
-## ✅ Testing
+## How it works
 
-FrameLab includes a lightweight regression test framework to reduce breakage when features evolve.
+1. **Configure in the sidebar**
+   - Choose provider/model and set API key/endpoint as needed.
+   - Load a prompt preset, then edit it freely.
 
-- Framework overview and architecture: [`docs/TESTING.md`](docs/TESTING.md)
-- Default offline suite (recommended, also used in CI):
-  ```bash
-  uv sync --extra test
-  uv run pytest
-  ```
-- Optional live provider smoke test (local only, explicit opt-in):
-  ```bash
-  uv run pytest --live
-  ```
+2. **Phase 1 — Primary Analysis**
+   - Add optional reference media + prompt/context, then click **Analyze**.
 
-Set `FRAMELAB_ENABLE_LIVE_TESTS=1` in local `.env` (see `.env.example`) to enable live execution.
-
-By default, test runs are offline (`not live`). Live tests are skipped in CI/cloud and require explicit local opt-in.
+3. **Phase 2 — Refinement Loop**
+   - Add refinement notes and optional follow-up media to iterate on the result.
 
 ---
 
-## 🔬 Technical Notes
+## Prompt presets
 
-- **API Compatibility**: FrameLab defaults to the `client.responses.create` path. If your provider doesn't support it, the app automatically falls back to standard Chat Completions.
-- **POS Highlighting**: Uses `spaCy`. It's off by default and only loads the `en_core_web_sm` model if you enable highlighting in the UI.
-- **Copy Behavior**: Outputs can be copied as plain text or markdown; POS highlighting only affects rendering and does not alter stored raw output.
-- **Session Memory**: Conversations are stored in Streamlit `session_state` and are cleared when you refresh the page.
-
----
-
-## 🛡️ License
-Distributed under the MIT License. See `LICENSE` for more information.
-
----
-
-## 🤝 Contributing
-
-Public contributions are welcome, especially around prompt quality and creative workflows.
-
-You can contribute by adding or improving presets in:
+You can customize behavior without editing app code:
 
 - `prompts/system/`
 - `prompts/initial/`
 - `prompts/correction/`
 
-Optional: include a matching `.meta.toml` file (same base name) to improve UI title/description/order.
-
-For technical/runtime details and behavior contracts, see [`docs/REFERENCE.md`](docs/REFERENCE.md).
+Optional: add `name.meta.toml` sidecars (`title`, `description`, `order`) for cleaner UI labels.
 
 ---
 
-Built with ❤️ by **Taruma Sakti** · Vibecoding with GPT-5.3-Codex
+## Documentation
+
+- [`docs/REFERENCE.md`](docs/REFERENCE.md) — technical/runtime details, advanced config, API behavior, contracts, troubleshooting
+- [`docs/TESTING.md`](docs/TESTING.md) — testing strategy and commands
+- [`CHANGELOG.md`](CHANGELOG.md) — release history and detailed changes
+- [`AGENTS.md`](AGENTS.md) — AI contributor/agent rules and architecture constraints
+
+---
+
+## License
+
+Distributed under the MIT License. See `LICENSE` for details.
+
+---
+
+Built with ❤️ by **Taruma Sakti** · Vibecoding with Cline + GPT-5.3-Codex
+
 
 
 

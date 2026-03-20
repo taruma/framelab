@@ -212,9 +212,12 @@ def render_answer_with_optional_pos_highlight(
 
 
 def render_usage(usage: dict | None, placeholder: st.delta_generator.DeltaGenerator) -> None:
+    placeholder.caption(build_usage_caption(usage))
+
+
+def build_usage_caption(usage: dict | None) -> str:
     if not usage:
-        placeholder.caption("Usage: not returned by this model/provider.")
-        return
+        return "Usage: not returned by this model/provider."
 
     input_tokens = usage.get("input_tokens")
     output_tokens = usage.get("output_tokens")
@@ -228,7 +231,7 @@ def render_usage(usage: dict | None, placeholder: st.delta_generator.DeltaGenera
     if isinstance(total_tokens, int):
         parts.append(f"total: {total_tokens}")
 
-    placeholder.caption(" · ".join(parts))
+    return " · ".join(parts)
 
 
 def one_line(text: str) -> str:
@@ -945,8 +948,6 @@ def render() -> None:
         phase1_thought_placeholder = phase1_thought_expander.empty()
         phase1_answer_placeholder = st.empty()
         phase1_pos_note_placeholder = st.empty()
-        phase1_usage_placeholder = st.empty()
-        phase1_copy_placeholder = st.empty()
 
         if st.session_state[PHASE1_REASONING]:
             phase1_thought_placeholder.markdown(st.session_state[PHASE1_REASONING])
@@ -958,21 +959,23 @@ def render() -> None:
                 phase1_highlight_enabled,
                 phase1_selected_tags,
             )
-            if st.session_state[PHASE1_EDITED_BY_USER]:
-                st.caption("Edited by user")
+            phase1_usage_col, phase1_edit_col = st.columns([8, 1.6], gap="small", vertical_alignment="center")
+            with phase1_usage_col:
+                usage_caption = build_usage_caption(st.session_state[PHASE1_USAGE])
+                if st.session_state[PHASE1_EDITED_BY_USER]:
+                    usage_caption += " · Edited by user"
+                st.caption(usage_caption)
+            with phase1_edit_col:
+                if st.button("✏️ Edit", key="phase1_edit_button", help="Edit output", disabled=ui_locked):
+                    st.session_state["phase1_edit_text"] = st.session_state[PHASE1_OUTPUT]
+                    edit_phase1_output_dialog(ui_locked)
 
-            if st.button("Edit output", key="phase1_edit_button", disabled=ui_locked):
-                st.session_state["phase1_edit_text"] = st.session_state[PHASE1_OUTPUT]
-                edit_phase1_output_dialog(ui_locked)
-
-            render_usage(st.session_state[PHASE1_USAGE], phase1_usage_placeholder)
-            with phase1_copy_placeholder.container():
-                render_copy_buttons(
-                    "Copy Plain Text",
-                    "Copy Markdown",
-                    st.session_state[PHASE1_OUTPUT],
-                    key="phase1_copy_button",
-                )
+            render_copy_buttons(
+                "Copy Plain Text",
+                "Copy Markdown",
+                st.session_state[PHASE1_OUTPUT],
+                key="phase1_copy_button",
+            )
 
     if analyze_clicked and not ui_locked:
         if not effective_api_key:
@@ -1012,7 +1015,6 @@ def render() -> None:
                     prefer_responses_api=st.session_state[PREFER_RESPONSES_API],
                 )
             st.session_state[PREFER_RESPONSES_API] = prefer_responses_api
-            render_usage(usage, phase1_usage_placeholder)
             render_answer_with_optional_pos_highlight(
                 phase1_answer_placeholder,
                 phase1_pos_note_placeholder,
@@ -1020,13 +1022,19 @@ def render() -> None:
                 phase1_highlight_enabled,
                 phase1_selected_tags,
             )
-            with phase1_copy_placeholder.container():
-                render_copy_buttons(
-                    "Copy Plain Text",
-                    "Copy Markdown",
-                    answer,
-                    key="phase1_copy_button",
-                )
+            phase1_usage_col, phase1_edit_col = st.columns([8, 1.6], gap="small", vertical_alignment="center")
+            with phase1_usage_col:
+                st.caption(build_usage_caption(usage))
+            with phase1_edit_col:
+                if st.button("✏️ Edit", key="phase1_edit_button_stream", help="Edit output", disabled=ui_locked):
+                    st.session_state["phase1_edit_text"] = answer
+                    edit_phase1_output_dialog(ui_locked)
+            render_copy_buttons(
+                "Copy Plain Text",
+                "Copy Markdown",
+                answer,
+                key="phase1_copy_button",
+            )
 
             st.session_state[PHASE1_DONE] = True
             st.session_state[PHASE1_OUTPUT] = answer
@@ -1167,8 +1175,6 @@ def render() -> None:
             phase2_thought_placeholder = phase2_thought_expander.empty()
             phase2_answer_placeholder = st.empty()
             phase2_pos_note_placeholder = st.empty()
-            phase2_usage_placeholder = st.empty()
-            phase2_copy_placeholder = st.empty()
 
             if st.session_state[PHASE2_REASONING]:
                 phase2_thought_placeholder.markdown(st.session_state[PHASE2_REASONING])
@@ -1180,21 +1186,23 @@ def render() -> None:
                     phase2_highlight_enabled,
                     phase2_selected_tags,
                 )
-                if st.session_state[PHASE2_EDITED_BY_USER]:
-                    st.caption("Edited by user")
+                phase2_usage_col, phase2_edit_col = st.columns([8, 1.6], gap="small", vertical_alignment="center")
+                with phase2_usage_col:
+                    usage_caption = build_usage_caption(st.session_state[PHASE2_USAGE])
+                    if st.session_state[PHASE2_EDITED_BY_USER]:
+                        usage_caption += " · Edited by user"
+                    st.caption(usage_caption)
+                with phase2_edit_col:
+                    if st.button("✏️ Edit", key="phase2_edit_button", help="Edit output", disabled=ui_locked):
+                        st.session_state["phase2_edit_text"] = st.session_state[PHASE2_OUTPUT]
+                        edit_phase2_output_dialog(ui_locked)
 
-                if st.button("Edit output", key="phase2_edit_button", disabled=ui_locked):
-                    st.session_state["phase2_edit_text"] = st.session_state[PHASE2_OUTPUT]
-                    edit_phase2_output_dialog(ui_locked)
-
-                render_usage(st.session_state[PHASE2_USAGE], phase2_usage_placeholder)
-                with phase2_copy_placeholder.container():
-                    render_copy_buttons(
-                        "Copy Plain Text",
-                        "Copy Markdown",
-                        st.session_state[PHASE2_OUTPUT],
-                        key="phase2_copy_button",
-                    )
+                render_copy_buttons(
+                    "Copy Plain Text",
+                    "Copy Markdown",
+                    st.session_state[PHASE2_OUTPUT],
+                    key="phase2_copy_button",
+                )
 
         if correction_clicked and not ui_locked:
             if not effective_api_key:
@@ -1233,7 +1241,6 @@ def render() -> None:
                         prefer_responses_api=st.session_state[PREFER_RESPONSES_API],
                     )
                 st.session_state[PREFER_RESPONSES_API] = prefer_responses_api
-                render_usage(usage, phase2_usage_placeholder)
                 render_answer_with_optional_pos_highlight(
                     phase2_answer_placeholder,
                     phase2_pos_note_placeholder,
@@ -1241,13 +1248,19 @@ def render() -> None:
                     phase2_highlight_enabled,
                     phase2_selected_tags,
                 )
-                with phase2_copy_placeholder.container():
-                    render_copy_buttons(
-                        "Copy Plain Text",
-                        "Copy Markdown",
-                        answer,
-                        key="phase2_copy_button",
-                    )
+                phase2_usage_col, phase2_edit_col = st.columns([8, 1.6], gap="small", vertical_alignment="center")
+                with phase2_usage_col:
+                    st.caption(build_usage_caption(usage))
+                with phase2_edit_col:
+                    if st.button("✏️ Edit", key="phase2_edit_button_stream", help="Edit output", disabled=ui_locked):
+                        st.session_state["phase2_edit_text"] = answer
+                        edit_phase2_output_dialog(ui_locked)
+                render_copy_buttons(
+                    "Copy Plain Text",
+                    "Copy Markdown",
+                    answer,
+                    key="phase2_copy_button",
+                )
 
                 messages.append({"role": "assistant", "content": answer})
                 st.session_state[CONVERSATION_MESSAGES] = messages

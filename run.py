@@ -53,7 +53,7 @@ SUPPORTED_IMAGE_TYPES = ["png", "jpg", "jpeg", "webp"]
 SUPPORTED_VIDEO_TYPES = ["mp4"]
 SUPPORTED_MEDIA_TYPES = SUPPORTED_IMAGE_TYPES + SUPPORTED_VIDEO_TYPES
 DEFAULT_INITIAL_PROMPT = "Analyze this reference image in highly detailed technical and creative terms."
-DEFAULT_CORRECTION_PROMPT = "Use this new image and correction notes to refine your previous analysis."
+DEFAULT_CORRECTION_PROMPT = "Use this new media and refinement notes to refine your previous analysis."
 ALLOWED_BADGE_COLORS = {"blue", "green", "orange", "red", "violet", "gray"}
 
 
@@ -786,7 +786,7 @@ def render() -> None:
     left_col, right_col = st.columns([1, 1.2], gap="large")
 
     with left_col:
-        st.subheader("Phase 1 · Initial Analysis")
+        st.subheader("Phase 1 · Primary Analysis")
         original_image = st.file_uploader(
             "Original Reference Media (image/video, optional)",
             type=SUPPORTED_MEDIA_TYPES,
@@ -993,7 +993,7 @@ def render() -> None:
         corr_left, corr_right = st.columns([1, 1.2], gap="large")
 
         with corr_left:
-            st.subheader("Phase 2 · Correction Flow")
+            st.subheader("Phase 2 · Refinement Loop")
             correction_image = st.file_uploader(
                 "Upload the generated/incorrect media (image/video, optional)",
                 type=SUPPORTED_MEDIA_TYPES,
@@ -1024,7 +1024,7 @@ def render() -> None:
             correction_preset_col, correction_load_col = st.columns([5, 1.25], gap="small")
             with correction_preset_col:
                 selected_correction_file = st.selectbox(
-                    "Correction Notes Preset",
+                    "Refinement Notes Preset",
                     options=correction_options,
                     index=default_correction_index,
                     format_func=lambda fn: next((p["title"] for p in correction_presets if p["filename"] == fn), fn),
@@ -1049,16 +1049,16 @@ def render() -> None:
                     "Load",
                     key="load_correction_preset",
                     disabled=ui_locked or not correction_options,
-                    help="Load selected preset into the Correction Notes text box.",
+                    help="Load selected preset into the Refinement Notes text box.",
                     width="stretch",
                 )
             if load_correction_clicked:
                 st.session_state["correction_notes_text"] = selected_correction_content or DEFAULT_CORRECTION_PROMPT
 
             correction_notes = st.text_area(
-                "Correction Notes",
+                "Refinement Notes",
                 key="correction_notes_text",
-                placeholder="Describe exactly how the model should correct the prior analysis.",
+                placeholder="Describe how the model should refine or revise the prior analysis.",
                 height=120,
                 disabled=ui_locked,
             )
@@ -1081,10 +1081,10 @@ def render() -> None:
                 key="phase2_transparency_preview",
             )
 
-            correction_clicked = st.button("Submit Correction", width="stretch", disabled=ui_locked)
+            correction_clicked = st.button("Run Refinement", width="stretch", disabled=ui_locked)
 
         with corr_right:
-            st.subheader("Updated Analysis")
+            st.subheader("Refined Analysis")
             phase2_highlight_enabled = st.checkbox(
                 "Highlight POS (EN only): verbs / adjectives / nouns",
                 key="phase2_pos_highlight",
@@ -1155,7 +1155,7 @@ def render() -> None:
             messages.append(correction_user_message)
 
             try:
-                with st.spinner("Applying correction..."):
+                with st.spinner("Running refinement..."):
                     answer, thought, usage, prefer_responses_api = stream_response(
                         client,
                         effective_model,

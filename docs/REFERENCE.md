@@ -12,7 +12,7 @@ FrameLab is a lightweight multimodal analysis app that:
 
 1. Accepts a reference image/video plus optional context
 2. Streams a detailed model analysis
-3. Supports an optional correction loop with a second image/video + correction notes
+3. Supports an optional refinement loop with a second image/video + refinement notes
 
 Primary run command:
 
@@ -119,7 +119,7 @@ System prompt resolution:
 3. Config default system preset (`config.toml`)
 4. `system_prompt.txt` fallback
 
-Initial prompt and correction notes:
+Initial prompt and refinement notes:
 
 - Source of truth is editable textbox content
 - Preset dropdown is a loader source via explicit **Load** action
@@ -163,12 +163,12 @@ default_correction = "10_refine_with_image.txt"
 
 ## Message/Conversation Contract
 
-Correction payload message order:
+Refinement payload message order:
 
 1. `system` prompt (if provided)
 2. `user`: original image + additional context
 3. `assistant`: first output
-4. `user`: correction image + correction notes
+4. `user`: refinement image + refinement notes
 
 Session state keys:
 

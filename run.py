@@ -560,34 +560,55 @@ def markdown_to_plain_text(text: str) -> str:
     return cleaned.strip()
 
 
-def render_copy_button(label: str, text: str, key: str) -> None:
-    copy_text = markdown_to_plain_text(text)
-    button_id = f"copy-btn-{key}"
+def render_copy_buttons(
+    plain_label: str,
+    raw_label: str,
+    text: str,
+    key: str,
+) -> None:
+    copy_text_plain = markdown_to_plain_text(text)
+    copy_text_raw = text or ""
+
+    plain_button_id = f"copy-btn-plain-{key}"
+    raw_button_id = f"copy-btn-raw-{key}"
     status_id = f"copy-status-{key}"
+
     st_html(
         f"""
-        <div style=\"display:flex;align-items:center;gap:8px;margin-top:4px;\">
-          <button id=\"{button_id}\" style=\"padding:0.35rem 0.7rem;border:1px solid #555;border-radius:0.4rem;background:#1f1f1f;color:#f3f3f3;cursor:pointer;\">{html_lib.escape(label)}</button>
+        <div style=\"display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;margin-top:6px;width:100%;\">
+          <div style=\"display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;\">
+            <button id=\"{plain_button_id}\" style=\"padding:0.35rem 0.7rem;border:1px solid #555;border-radius:0.4rem;background:#1f1f1f;color:#f3f3f3;cursor:pointer;\">{html_lib.escape(plain_label)}</button>
+            <button id=\"{raw_button_id}\" style=\"padding:0.35rem 0.7rem;border:1px solid #555;border-radius:0.4rem;background:#1f1f1f;color:#f3f3f3;cursor:pointer;\">{html_lib.escape(raw_label)}</button>
+          </div>
           <span id=\"{status_id}\" style=\"font-size:0.85rem;color:#6c757d;\"></span>
         </div>
         <script>
-          const textToCopy = {json.dumps(copy_text)};
-          const btn = document.getElementById({json.dumps(button_id)});
+          const textToCopyPlain = {json.dumps(copy_text_plain)};
+          const textToCopyRaw = {json.dumps(copy_text_raw)};
+          const plainBtn = document.getElementById({json.dumps(plain_button_id)});
+          const rawBtn = document.getElementById({json.dumps(raw_button_id)});
           const status = document.getElementById({json.dumps(status_id)});
-          if (btn && status) {{
-            btn.onclick = async () => {{
-              try {{
-                await navigator.clipboard.writeText(textToCopy);
-                status.textContent = 'Copied';
-              }} catch (e) {{
-                status.textContent = 'Copy failed';
-              }}
-              setTimeout(() => {{ status.textContent = ''; }}, 1200);
-            }};
+
+          async function copyWithStatus(textToCopy, successLabel) {{
+            if (!status) return;
+            try {{
+              await navigator.clipboard.writeText(textToCopy);
+              status.textContent = successLabel;
+            }} catch (e) {{
+              status.textContent = 'Copy failed';
+            }}
+            setTimeout(() => {{ status.textContent = ''; }}, 1200);
+          }}
+
+          if (plainBtn) {{
+            plainBtn.onclick = async () => copyWithStatus(textToCopyPlain, 'Copied plain text');
+          }}
+          if (rawBtn) {{
+            rawBtn.onclick = async () => copyWithStatus(textToCopyRaw, 'Copied as-is');
           }}
         </script>
         """,
-        height=44,
+        height=74,
     )
 
 
@@ -888,8 +909,9 @@ def render() -> None:
             )
             render_usage(st.session_state[PHASE1_USAGE], phase1_usage_placeholder)
             with phase1_copy_placeholder.container():
-                render_copy_button(
-                    "Copy Output (plain text)",
+                render_copy_buttons(
+                    "Copy Plain Text",
+                    "Copy Markdown",
                     st.session_state[PHASE1_OUTPUT],
                     key="phase1_copy_button",
                 )
@@ -941,7 +963,12 @@ def render() -> None:
                 phase1_selected_tags,
             )
             with phase1_copy_placeholder.container():
-                render_copy_button("Copy Output (plain text)", answer, key="phase1_copy_button")
+                render_copy_buttons(
+                    "Copy Plain Text",
+                    "Copy Markdown",
+                    answer,
+                    key="phase1_copy_button",
+                )
 
             st.session_state[PHASE1_DONE] = True
             st.session_state[PHASE1_OUTPUT] = answer
@@ -1095,8 +1122,9 @@ def render() -> None:
                 )
                 render_usage(st.session_state[PHASE2_USAGE], phase2_usage_placeholder)
                 with phase2_copy_placeholder.container():
-                    render_copy_button(
-                        "Copy Updated Analysis (plain text)",
+                    render_copy_buttons(
+                        "Copy Plain Text",
+                        "Copy Markdown",
                         st.session_state[PHASE2_OUTPUT],
                         key="phase2_copy_button",
                     )
@@ -1147,8 +1175,9 @@ def render() -> None:
                     phase2_selected_tags,
                 )
                 with phase2_copy_placeholder.container():
-                    render_copy_button(
-                        "Copy Updated Analysis (plain text)",
+                    render_copy_buttons(
+                        "Copy Plain Text",
+                        "Copy Markdown",
                         answer,
                         key="phase2_copy_button",
                     )

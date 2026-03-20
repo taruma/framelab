@@ -36,6 +36,7 @@ Keep the current lightweight modular layout unless explicitly asked otherwise.
   - Streamlit UI layout and app bootstrap for `uv run run.py`
   - Sidebar config handling (provider preset, API key, endpoint, model, reasoning effort, editable system prompt + preset loader)
   - Phase 1/Phase 2 orchestration and usage rendering
+  - Optional session request logging + JSON export (session-only)
   - Per-phase Request Transparency preview and processing-state locking
   - Optional EN POS highlighting for outputs (Verb/Adjective/Noun) with lazy/cached spaCy model loading
 - `app_state.py`
@@ -68,9 +69,9 @@ Must preserve:
   1) `Thought Process` expander
   2) final streamed response
   3) usage caption (when provided)
-- One-click copy buttons for Phase 1 and Phase 2 outputs (plain text).
+- Copy actions per output: **Copy Plain Text** and **Copy Markdown**.
 - Optional POS highlighting controls per output (EN only), with separate selection for Verb/Adjective/Noun.
-- Highlighted rendering must not modify stored raw outputs; copy remains plain text.
+- Highlighted rendering must not modify stored raw outputs; plain-text copy remains plain text and markdown copy remains raw markdown.
 - Streaming should feel live (incremental updates, not batch render).
 
 ---
@@ -83,8 +84,13 @@ Session keys currently used:
 - `conversation_messages`
 - `phase1_output`, `phase1_reasoning`
 - `phase1_usage`
+- `phase1_edited_by_user`
 - `phase2_output`, `phase2_reasoning`
 - `phase2_usage`
+- `phase2_edited_by_user`
+- `prefer_responses_api`
+- `is_processing`, `pending_action`, `last_error`
+- `request_logging_enabled`, `request_logs`
 
 Configuration/prompt precedence must remain:
 
@@ -160,9 +166,9 @@ Before finishing any iteration, verify:
 - [ ] Refinement call includes prior assistant output in context
 - [ ] Request Transparency expander is present per phase and payload preview updates with current inputs
 - [ ] System/Initial/Refinement preset loading populates editable textboxes; manual edits remain user-controlled
-- [ ] Copy output buttons work for Phase 1 and Phase 2 plain-text results
+- [ ] Copy actions work for Phase 1 and Phase 2 (Copy Plain Text + Copy Markdown)
 - [ ] POS highlighting is optional/default OFF, and per-tag selection (Verb/Adjective/Noun) works when enabled
-- [ ] Copy output remains plain text even when highlighted rendering is enabled
+- [ ] Copy Plain Text remains plain text and Copy Markdown preserves raw markdown when highlighting is enabled
 - [ ] Responses API path works, or fallback to Chat Completions works clearly
 - [ ] Usage caption behavior is correct (shown when available, fallback message otherwise)
 - [ ] `README.md` and `AGENTS.md` are up to date

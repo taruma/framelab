@@ -93,8 +93,9 @@ uv run run.py
 
 ### Copy behavior
 
-- Phase 1 and Phase 2 provide one-click copy actions
-- Copy output is plain text, even when highlighted rendering is enabled
+- Phase 1 and Phase 2 provide two copy actions per output: **Copy Plain Text** and **Copy Markdown**
+- Plain-text copy remains plain text even when highlighted rendering is enabled
+- Markdown copy preserves raw markdown output (highlighting does not mutate stored raw text)
 
 ### Optional POS highlighting (EN)
 
@@ -165,7 +166,7 @@ Config defaults live in `[prompts]` in `config.toml`:
 system_dir = "prompts/system"
 initial_dir = "prompts/initial"
 correction_dir = "prompts/correction"
-default_system = "02_general_assist.txt"
+default_system = "10_frame_breakdown.txt"
 default_initial = "10_image_deepdive.txt"
 default_correction = "10_refine_with_image.txt"
 ```
@@ -207,7 +208,12 @@ Session state keys:
 - `phase1_done`
 - `conversation_messages`
 - `phase1_output`, `phase1_reasoning`, `phase1_usage`
+- `phase1_edited_by_user`
 - `phase2_output`, `phase2_reasoning`, `phase2_usage`
+- `phase2_edited_by_user`
+- `prefer_responses_api`
+- `is_processing`, `pending_action`, `last_error`
+- `request_logging_enabled`, `request_logs`
 
 ---
 

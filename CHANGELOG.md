@@ -7,36 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-03-20
+
 ### Added
 
-- Added multi-media upload support in both Phase 1 and Phase 2 (single or multiple image/video files).
-- Added per-item media tagging with editable defaults:
-  - images use `@image1`, `@image2`, ...
-  - videos use `@video1`, `@video2`, ...
-- Added tagged multi-media request composition where each media item is paired with adjacent tag text in the payload.
+- Added optional text-only mode for both phases (media upload is no longer required).
+- Added multi-media upload support across Phase 1 and Phase 2 (single or multiple image/video files).
+- Added per-item media tagging with editable defaults (`@imageN` / `@videoN`) and tagged payload composition for multi-media requests.
+- Added a dedicated **Manage media tags** dialog with full-size preview and tag editing.
+- Added output editing dialogs for both Phase 1 and Phase 2, with edited content persisted to conversation context.
+- Added a large sidebar dialog editor for the System Prompt.
+- Added optional session request logging with JSON export download.
+- Added configurable hero notices via `config.toml`.
+- Added offline CI pytest coverage plus opt-in live smoke execution via `--live` and `.env` loading in tests.
 
 ### Changed
 
-- Preserved backward-compatible single-media message behavior while enabling tagged composition only for multi-media uploads.
-- Enhanced Request Transparency previews for multi-media mode with media-count summary and media-tag mapping chips.
-- Improved multi-media UX with compact thumbnail previews in the main panel and full-size preview + tag editing inside a dialog.
-- Fixed multi-media tag persistence so edited tags remain stable when files are added/removed (signature-based mapping).
-- Expanded test coverage for multi-media payload composition, media-tag helpers, and transparency preview contracts.
-- Updated System Prompt UX to match Initial/Refinement behavior:
-  - the editable **System Prompt** textbox is now the request source of truth
-  - system preset selection now uses explicit **Load** action to populate the textbox
-  - textbox initial value is prefilled from config default system preset, then selected preset, then `system_prompt.txt` fallback
+- Updated workflow terminology to **Primary Analysis** (Phase 1) and **Refinement Loop** (Phase 2).
+- Updated System Prompt behavior so the editable textbox is the request source of truth; preset dropdown now loads via explicit **Load** action.
+- Improved Request Transparency previews for multi-media payloads (media summaries and media-tag mapping).
+- Updated output copy actions to support both **Copy Plain Text** and **Copy Markdown**.
+- Updated phase headers and reasoning sections with Material icon labels.
+- Refined in-app notice content, including Xiaomi/OpenRouter update messaging.
 
-### Changed
+### Fixed
 
-- Updated workflow terminology to better match current functionality:
-  - Phase 1 now uses **Primary Analysis** wording.
-  - Phase 2 now uses **Refinement Loop** wording.
-  - UI labels and actions now use **Refinement Notes / Run Refinement / Refined Analysis** terminology.
+- Fixed media-tag persistence to remain stable when media items are added/removed (signature-based mapping).
+- Improved setup reliability by bundling `en_core_web_sm` via dependency wheel and aligning guidance around `uv sync`.
+- Improved UI edit ergonomics by widening system prompt and phase-output edit dialogs.
 
 ### Documentation
 
-- Updated naming references across `README.md`, `hero.md`, `docs/REFERENCE.md`, and `AGENTS.md` to align with the refinement-loop workflow language.
+- Updated `README.md`, `AGENTS.md`, `docs/REFERENCE.md`, and `docs/TESTING.md` to match current behavior and testing workflow.
 
 ## [1.2.1] - 2026-03-13
 

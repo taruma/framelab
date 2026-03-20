@@ -36,13 +36,13 @@ https://github.com/user-attachments/assets/5dd8a80b-d9d8-4150-a4a5-7bdca75738cc
 - **Responses API Native**: Built to use the latest OpenAI Responses API with automatic fallback to Chat Completions.
 - **Request Transparency**: Peek under the hood with a live-updating payload preview before you send requests.
 - **Session Request Logging (Optional)**: Save request/response attempt logs for the current session and download as JSON (media base64 is omitted; filenames are kept).
-- **Provider Presets**: Easily switch between OpenAI, Gemini, OpenRouter, BytePlus, or local endpoints via `config.toml`.
+- **Provider Presets**: Easily switch between OpenAI, Gemini, OpenRouter, BytePlus, Claude, Xiaomi, or other OpenAI-compatible endpoints via `config.toml`.
 - **Reasoning Stream**: View the model's "thought process" in real-time for reasoning-capable models.
 
 ### 🎨 UI & Experience
 - **Live Streaming**: Real-time output rendering for immediate feedback.
 - **POS Highlighting**: Optional English Part-of-Speech highlighting (Verbs, Adjectives, Nouns) to help scan technical terminology.
-- **One-Click Copy**: Clean "Copy to Clipboard" buttons for raw analysis text.
+- **Flexible Copy Actions**: One-click **Copy Plain Text** or **Copy Markdown** actions for each phase output.
 - **Editable Output (Dialog)**: Edit Phase 1 or Phase 2 markdown output in a simple Submit/Cancel dialog, while keeping the main view clean.
 
 ---
@@ -157,6 +157,7 @@ By default, test runs are offline (`not live`). Live tests are skipped in CI/clo
 
 - **API Compatibility**: FrameLab defaults to the `client.responses.create` path. If your provider doesn't support it, the app automatically falls back to standard Chat Completions.
 - **POS Highlighting**: Uses `spaCy`. It's off by default and only loads the `en_core_web_sm` model if you enable highlighting in the UI.
+- **Copy Behavior**: Outputs can be copied as plain text or markdown; POS highlighting only affects rendering and does not alter stored raw output.
 - **Session Memory**: Conversations are stored in Streamlit `session_state` and are cleared when you refresh the page.
 
 ---
@@ -183,6 +184,7 @@ For technical/runtime details and behavior contracts, see [`docs/REFERENCE.md`](
 ---
 
 Built with ❤️ by **Taruma Sakti** · Vibecoding with GPT-5.3-Codex
+
 
 
 

@@ -921,7 +921,7 @@ def edit_system_prompt_dialog(ui_locked: bool) -> None:
         st.rerun()
 
 
-@st.dialog("Edit Phase 1 Output")
+@st.dialog("Edit Phase 1 Output", width="large")
 def edit_phase1_output_dialog(ui_locked: bool) -> None:
     st.text_area(
         "Edit Phase 1 markdown output",
@@ -946,7 +946,7 @@ def edit_phase1_output_dialog(ui_locked: bool) -> None:
         st.rerun()
 
 
-@st.dialog("Edit Phase 2 Output")
+@st.dialog("Edit Phase 2 Output", width="large")
 def edit_phase2_output_dialog(ui_locked: bool) -> None:
     st.text_area(
         "Edit Phase 2 markdown output",

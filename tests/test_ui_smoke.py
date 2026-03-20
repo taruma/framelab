@@ -10,9 +10,9 @@ def test_phase1_sections_render_by_default() -> None:
     app.run(timeout=20)
 
     subheaders = [s.value for s in app.subheader]
-    assert "Phase 1 · Primary Analysis" in subheaders
-    assert "Phase 1 Output" in subheaders
-    assert "Phase 2 · Refinement Loop" not in subheaders
+    assert ":material/photo_camera: Phase 1 · Primary Analysis" in subheaders
+    assert ":material/description: Phase 1 Output" in subheaders
+    assert ":material/sync_alt: Phase 2 · Refinement Loop" not in subheaders
 
 
 def test_phase2_sections_visible_after_phase1_done_state() -> None:
@@ -21,8 +21,8 @@ def test_phase2_sections_visible_after_phase1_done_state() -> None:
     app.run(timeout=20)
 
     subheaders = [s.value for s in app.subheader]
-    assert "Phase 2 · Refinement Loop" in subheaders
-    assert "Refined Analysis" in subheaders
+    assert ":material/sync_alt: Phase 2 · Refinement Loop" in subheaders
+    assert ":material/auto_awesome: Refined Analysis" in subheaders
 
 
 def test_analyze_without_media_does_not_require_upload() -> None:

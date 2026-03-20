@@ -786,7 +786,7 @@ def render() -> None:
     left_col, right_col = st.columns([1, 1.2], gap="large")
 
     with left_col:
-        st.subheader("Phase 1 · Primary Analysis")
+        st.subheader(":material/photo_camera: Phase 1 · Primary Analysis")
         original_image = st.file_uploader(
             "Original Reference Media (image/video, optional)",
             type=SUPPORTED_MEDIA_TYPES,
@@ -871,7 +871,7 @@ def render() -> None:
         analyze_clicked = st.button("Analyze", type="primary", width="stretch", disabled=ui_locked)
 
     with right_col:
-        st.subheader("Phase 1 Output")
+        st.subheader(":material/description: Phase 1 Output")
         phase1_highlight_enabled = st.checkbox(
             "Highlight POS (EN only): verbs / adjectives / nouns",
             key="phase1_pos_highlight",
@@ -890,7 +890,7 @@ def render() -> None:
             disabled=not phase1_highlight_enabled,
         )
         phase1_selected_tags = {phase1_pos_options[label] for label in phase1_selected_labels}
-        phase1_thought_expander = st.expander("Thought Process", expanded=True)
+        phase1_thought_expander = st.expander(":material/psychology: Thought Process", expanded=True)
         phase1_thought_placeholder = phase1_thought_expander.empty()
         phase1_answer_placeholder = st.empty()
         phase1_pos_note_placeholder = st.empty()
@@ -993,7 +993,7 @@ def render() -> None:
         corr_left, corr_right = st.columns([1, 1.2], gap="large")
 
         with corr_left:
-            st.subheader("Phase 2 · Refinement Loop")
+            st.subheader(":material/sync_alt: Phase 2 · Refinement Loop")
             correction_image = st.file_uploader(
                 "Upload the generated/incorrect media (image/video, optional)",
                 type=SUPPORTED_MEDIA_TYPES,
@@ -1084,7 +1084,7 @@ def render() -> None:
             correction_clicked = st.button("Run Refinement", width="stretch", disabled=ui_locked)
 
         with corr_right:
-            st.subheader("Refined Analysis")
+            st.subheader(":material/auto_awesome: Refined Analysis")
             phase2_highlight_enabled = st.checkbox(
                 "Highlight POS (EN only): verbs / adjectives / nouns",
                 key="phase2_pos_highlight",
@@ -1103,7 +1103,7 @@ def render() -> None:
                 disabled=not phase2_highlight_enabled,
             )
             phase2_selected_tags = {phase2_pos_options[label] for label in phase2_selected_labels}
-            phase2_thought_expander = st.expander("Thought Process", expanded=True)
+            phase2_thought_expander = st.expander(":material/psychology: Thought Process", expanded=True)
             phase2_thought_placeholder = phase2_thought_expander.empty()
             phase2_answer_placeholder = st.empty()
             phase2_pos_note_placeholder = st.empty()

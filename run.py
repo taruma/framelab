@@ -339,54 +339,156 @@ def find_duplicate_media_tags(media_items: list[dict[str, Any]]) -> list[str]:
     return sorted(duplicates)
 
 
+def make_media_signature(uploaded_file: Any) -> str:
+    return (
+        f"{getattr(uploaded_file, 'name', '')}:"
+        f"{getattr(uploaded_file, 'size', '')}:"
+        f"{getattr(uploaded_file, 'type', '')}"
+    )
+
+
+def merge_media_tag_map(
+    existing_tag_map: dict[str, str],
+    signatures: list[str],
+    default_tags: list[str],
+) -> dict[str, str]:
+    merged: dict[str, str] = {}
+    for idx, signature in enumerate(signatures):
+        existing = str(existing_tag_map.get(signature, "")).strip()
+        merged[signature] = existing or default_tags[idx]
+    return merged
+
+
 def collect_tagged_media_inputs(
     uploaded_files: Any,
     *,
     phase_key_prefix: str,
-    ui_locked: bool,
-    image_caption_prefix: str,
 ) -> list[dict[str, Any]]:
     files = normalize_uploaded_files(uploaded_files)
     default_tags = build_default_media_tags(files)
 
-    signature_key = f"{phase_key_prefix}_media_signatures"
-    signatures = [
-        f"{getattr(f, 'name', '')}:{getattr(f, 'size', '')}:{getattr(f, 'type', '')}"
-        for f in files
-    ]
-    if st.session_state.get(signature_key) != signatures:
-        for idx, default_tag in enumerate(default_tags):
-            st.session_state[f"{phase_key_prefix}_media_tag_{idx}"] = default_tag
-        st.session_state[signature_key] = signatures
+    tag_map_key = f"{phase_key_prefix}_media_tag_map"
+    existing_tag_map = st.session_state.get(tag_map_key, {})
+    if not isinstance(existing_tag_map, dict):
+        existing_tag_map = {}
+
+    signatures = [make_media_signature(f) for f in files]
+    merged_tag_map = merge_media_tag_map(existing_tag_map, signatures, default_tags)
+    st.session_state[tag_map_key] = merged_tag_map
 
     items: list[dict[str, Any]] = []
     for idx, uploaded in enumerate(files):
         kind = get_media_kind(uploaded)
         source_name = str(getattr(uploaded, "name", "")).strip() or f"media_{idx + 1}"
-
-        if kind == "video":
-            st.video(uploaded)
-        else:
-            st.image(uploaded, caption=f"{image_caption_prefix} image {idx + 1} preview", width="stretch")
-
-        tag_key = f"{phase_key_prefix}_media_tag_{idx}"
-        tag_input = st.text_input(
-            f"Tag/annotation for {kind} {idx + 1}",
-            key=tag_key,
-            disabled=ui_locked,
-            help="Used in request payload to reference this media item.",
-        )
-        final_tag = (tag_input or "").strip() or default_tags[idx]
+        signature = signatures[idx]
+        final_tag = merged_tag_map.get(signature, default_tags[idx])
         items.append(
             {
                 "file": uploaded,
                 "tag": final_tag,
                 "kind": kind,
                 "name": source_name,
+                "signature": signature,
+                "default_tag": default_tags[idx],
             }
         )
 
     return items
+
+
+def render_multi_media_thumbnail_strip(media_items: list[dict[str, Any]]) -> None:
+    if not media_items:
+        return
+
+    col_count = min(4, len(media_items))
+    cols = st.columns(col_count, gap="small")
+
+    for idx, item in enumerate(media_items):
+        with cols[idx % col_count]:
+            if item["kind"] == "video":
+                st.markdown("🎬 **Video**")
+                st.caption(item["name"])
+            else:
+                st.image(item["file"], width=130)
+            st.caption(item["tag"])
+
+
+def media_dialog_input_key(phase_key_prefix: str, signature: str) -> str:
+    safe_signature = re.sub(r"[^a-zA-Z0-9_]", "_", signature)
+    return f"{phase_key_prefix}_media_dialog_tag_{safe_signature}"
+
+
+def clear_media_dialog_inputs(phase_key_prefix: str, media_items: list[dict[str, Any]]) -> None:
+    for item in media_items:
+        st.session_state.pop(media_dialog_input_key(phase_key_prefix, item["signature"]), None)
+
+
+def render_media_tag_dialog_body(
+    *,
+    phase_key_prefix: str,
+    media_items: list[dict[str, Any]],
+    ui_locked: bool,
+) -> None:
+    if not media_items:
+        st.info("No media uploaded.")
+        if st.button("Close", key=f"{phase_key_prefix}_media_dialog_close_empty", width="stretch"):
+            clear_media_dialog_inputs(phase_key_prefix, media_items)
+            st.rerun()
+        return
+
+    st.caption("Edit tags below. Full-size previews are shown in this dialog.")
+
+    for idx, item in enumerate(media_items):
+        st.markdown(f"**{idx + 1}. {item['name']}**")
+        if item["kind"] == "video":
+            st.video(item["file"])
+        else:
+            st.image(item["file"], width="stretch")
+
+        input_key = media_dialog_input_key(phase_key_prefix, item["signature"])
+        if input_key not in st.session_state:
+            st.session_state[input_key] = item["tag"]
+
+        st.text_input(
+            "Tag/annotation",
+            key=input_key,
+            disabled=ui_locked,
+            help="Used in request payload to reference this media item.",
+        )
+        st.divider()
+
+    apply_col, cancel_col = st.columns(2)
+    if apply_col.button("Apply tags", type="primary", disabled=ui_locked, width="stretch"):
+        updated_map: dict[str, str] = {}
+        for item in media_items:
+            input_key = media_dialog_input_key(phase_key_prefix, item["signature"])
+            typed = str(st.session_state.get(input_key, "")).strip()
+            updated_map[item["signature"]] = typed or item["default_tag"]
+        st.session_state[f"{phase_key_prefix}_media_tag_map"] = updated_map
+        clear_media_dialog_inputs(phase_key_prefix, media_items)
+        st.rerun()
+
+    if cancel_col.button("Cancel", disabled=ui_locked, width="stretch"):
+        clear_media_dialog_inputs(phase_key_prefix, media_items)
+        st.rerun()
+
+
+@st.dialog("Manage Phase 1 Media Tags")
+def manage_phase1_media_dialog(media_items: list[dict[str, Any]], ui_locked: bool) -> None:
+    render_media_tag_dialog_body(
+        phase_key_prefix="phase1",
+        media_items=media_items,
+        ui_locked=ui_locked,
+    )
+
+
+@st.dialog("Manage Phase 2 Media Tags")
+def manage_phase2_media_dialog(media_items: list[dict[str, Any]], ui_locked: bool) -> None:
+    render_media_tag_dialog_body(
+        phase_key_prefix="phase2",
+        media_items=media_items,
+        ui_locked=ui_locked,
+    )
 
 
 def make_request_media_input(media_items: list[dict[str, Any]]) -> Any:
@@ -1020,9 +1122,24 @@ def render() -> None:
         phase1_media_items = collect_tagged_media_inputs(
             original_image,
             phase_key_prefix="phase1",
-            ui_locked=ui_locked,
-            image_caption_prefix="Original",
         )
+        if len(phase1_media_items) == 1:
+            single_item = phase1_media_items[0]
+            if single_item["kind"] == "video":
+                st.video(single_item["file"])
+            else:
+                st.image(single_item["file"], caption="Original image preview", width="stretch")
+        elif len(phase1_media_items) > 1:
+            st.caption("Multiple media detected. Showing compact thumbnails; open dialog for full-size preview + tags.")
+            render_multi_media_thumbnail_strip(phase1_media_items)
+            if st.button(
+                "Manage media tags",
+                key="phase1_manage_media_tags",
+                disabled=ui_locked,
+                width="stretch",
+            ):
+                manage_phase1_media_dialog(phase1_media_items, ui_locked)
+
         phase1_duplicate_tags = find_duplicate_media_tags(phase1_media_items)
         if phase1_duplicate_tags:
             st.warning(
@@ -1255,9 +1372,24 @@ def render() -> None:
             phase2_media_items = collect_tagged_media_inputs(
                 correction_image,
                 phase_key_prefix="phase2",
-                ui_locked=ui_locked,
-                image_caption_prefix="Correction",
             )
+            if len(phase2_media_items) == 1:
+                single_item = phase2_media_items[0]
+                if single_item["kind"] == "video":
+                    st.video(single_item["file"])
+                else:
+                    st.image(single_item["file"], caption="Correction image preview", width="stretch")
+            elif len(phase2_media_items) > 1:
+                st.caption("Multiple media detected. Showing compact thumbnails; open dialog for full-size preview + tags.")
+                render_multi_media_thumbnail_strip(phase2_media_items)
+                if st.button(
+                    "Manage media tags",
+                    key="phase2_manage_media_tags",
+                    disabled=ui_locked,
+                    width="stretch",
+                ):
+                    manage_phase2_media_dialog(phase2_media_items, ui_locked)
+
             phase2_duplicate_tags = find_duplicate_media_tags(phase2_media_items)
             if phase2_duplicate_tags:
                 st.warning(

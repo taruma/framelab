@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Preserved backward-compatible single-media message behavior while enabling tagged composition only for multi-media uploads.
 - Enhanced Request Transparency previews for multi-media mode with media-count summary and media-tag mapping chips.
+- Improved multi-media UX with compact thumbnail previews in the main panel and full-size preview + tag editing inside a dialog.
+- Fixed multi-media tag persistence so edited tags remain stable when files are added/removed (signature-based mapping).
 - Expanded test coverage for multi-media payload composition, media-tag helpers, and transparency preview contracts.
 
 ### Changed

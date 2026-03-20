@@ -7,6 +7,7 @@ from run import (
     build_phase2_transparency_preview,
     build_default_media_tags,
     find_duplicate_media_tags,
+    merge_media_tag_map,
     markdown_to_plain_text,
     summarize_media_kind,
     summarize_media_tag_map,
@@ -162,3 +163,19 @@ def test_find_duplicate_media_tags_is_case_insensitive() -> None:
         ]
     )
     assert dupes == ["@Character", "@character"]
+
+
+def test_merge_media_tag_map_preserves_existing_and_assigns_defaults_to_new() -> None:
+    existing = {
+        "a.jpg:10:image/jpeg": "@character",
+        "removed.jpg:20:image/jpeg": "@old",
+    }
+    signatures = ["a.jpg:10:image/jpeg", "b.jpg:11:image/jpeg"]
+    defaults = ["@image1", "@image2"]
+
+    merged = merge_media_tag_map(existing, signatures, defaults)
+
+    assert merged == {
+        "a.jpg:10:image/jpeg": "@character",
+        "b.jpg:11:image/jpeg": "@image2",
+    }

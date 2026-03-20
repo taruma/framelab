@@ -68,7 +68,8 @@ uv run run.py
 - **Phase 1** is always visible.
 - **Phase 2** appears only after Phase 1 completes.
 - Both phases support image/video upload preview (single or multiple files).
-- For multi-media uploads, each item gets an editable tag/annotation field.
+- For multi-media uploads, the main panel uses compact thumbnail previews with tag captions.
+- Full-size preview + tag editing for multi-media is handled in a **Manage media tags** dialog.
 
 ### Right-panel output order (per phase)
 
@@ -84,6 +85,11 @@ uv run run.py
 - Preview is live-updated from current input state
 - For multiple media items, preview includes media summary + media-tag mapping chip.
 - For single media items, preview keeps legacy compact behavior (kind only).
+
+### Multi-media tag persistence
+
+- Tags are persisted by per-file signature (`name + size + mime`) in session state.
+- Adding/removing files preserves tags for existing files and assigns defaults only to new files.
 
 ### Copy behavior
 

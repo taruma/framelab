@@ -28,6 +28,7 @@ https://github.com/user-attachments/assets/5dd8a80b-d9d8-4150-a4a5-7bdca75738cc
 - **Optional Media Input**: Use FrameLab as text-only chat, or attach one or more images/videos for multimodal analysis.
 - **Image & Video Support**: Analyze images (PNG, JPG, WEBP) or MP4 videos up to 30MB.
 - **Media Tagging**: Uploaded media gets default aliases (`@image1`, `@image2`, `@video1`, ...), and each tag is editable before sending.
+- **Compact Multi-Media UX**: For multi-media uploads, FrameLab shows compact thumbnails in the main flow and opens a full-size dialog for tag editing.
 - **Two-Phase Workflow**: Start with a primary analysis and refine it with an optional refinement loop.
 - **Cinematic Presets**: Built-in system prompts for film directors, script architects, and image critics.
 
@@ -83,7 +84,7 @@ FrameLab uses `uv` for fast dependency and runtime management.
 Configure your model settings in the sidebar. You can select from pre-configured **Providers** or manually override the API Key, Endpoint, and Model name.
 
 ### Step 2: Phase 1 — Primary Analysis
-Optionally upload one or more **Original Reference Media** items, then select an **Initial Prompt** (or write your own), and click **Analyze**. You can run fully text-only (chat-style) or multimodal with media attached. For multi-media uploads, FrameLab includes per-media tags in the request payload and lets you rename those tags before submission. After generation, you can click **Edit output** to adjust the markdown result in a dialog.
+Optionally upload one or more **Original Reference Media** items, then select an **Initial Prompt** (or write your own), and click **Analyze**. You can run fully text-only (chat-style) or multimodal with media attached. For multi-media uploads, FrameLab shows compact thumbnails in the main panel, and a **Manage media tags** dialog provides full-size previews plus per-item tag editing before submission. After generation, you can click **Edit output** to adjust the markdown result in a dialog.
 
 ### Step 3: Phase 2 — Refinement Loop (Optional)
 If the analysis needs refinement, provide **Refinement Notes** and optionally upload one or more **Refinement Image/Video** items. This sends the original context, the first answer, and your refinement input (text-only or with media) back to the model for an improved result. If you edited the Phase 1 output, the refinement step uses that edited text as the prior assistant context.
@@ -181,6 +182,7 @@ For technical/runtime details and behavior contracts, see [`docs/REFERENCE.md`](
 ---
 
 Built with ❤️ by **Taruma Sakti** · Vibecoding with GPT-5.3-Codex
+
 
 
 

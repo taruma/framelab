@@ -10,9 +10,9 @@ If you just want to run the app, start with [`README.md`](../README.md).
 
 FrameLab is a lightweight multimodal analysis app that:
 
-1. Accepts a reference image/video plus optional context
+1. Accepts one or more reference image/video items plus optional context
 2. Streams a detailed model analysis
-3. Supports an optional correction loop with a second image/video + correction notes
+3. Supports an optional refinement loop with one or more additional image/video items + refinement notes
 
 Primary run command:
 
@@ -55,7 +55,7 @@ LLM_API_KEY=your_real_key
 
 ```bash
 uv init
-uv add streamlit openai spacy
+uv add streamlit openai spacy "en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl"
 uv run run.py
 ```
 
@@ -67,7 +67,16 @@ uv run run.py
 
 - **Phase 1** is always visible.
 - **Phase 2** appears only after Phase 1 completes.
-- Both phases support image/video upload preview.
+- Both phases support image/video upload preview (single or multiple files).
+- For multi-media uploads, the main panel uses compact thumbnail previews with tag captions.
+- Full-size preview + tag editing for multi-media is handled in a **Manage media tags** dialog.
+
+### Output editing dialogs
+
+- Both phases support markdown output editing via dialog:
+  - **Edit Phase 1 Output**
+  - **Edit Phase 2 Output**
+- If Phase 1 output is edited by the user, the refinement step uses the edited version as prior assistant context.
 
 ### Right-panel output order (per phase)
 
@@ -81,11 +90,25 @@ uv run run.py
 - Collapsed by default
 - Shows request metadata and compact payload preview
 - Preview is live-updated from current input state
+- For multiple media items, preview includes media summary + media-tag mapping chip.
+- For single media items, preview keeps legacy compact behavior (kind only).
+
+### Session request logging (optional)
+
+- Request-attempt logging can be enabled per session.
+- Logged attempts can be downloaded as JSON.
+- Media base64 payload is omitted in logs; filenames are preserved for traceability.
+
+### Multi-media tag persistence
+
+- Tags are persisted by per-file signature (`name + size + mime`) in session state.
+- Adding/removing files preserves tags for existing files and assigns defaults only to new files.
 
 ### Copy behavior
 
-- Phase 1 and Phase 2 provide one-click copy actions
-- Copy output is plain text, even when highlighted rendering is enabled
+- Phase 1 and Phase 2 provide two copy actions per output: **Copy Plain Text** and **Copy Markdown**
+- Plain-text copy remains plain text even when highlighted rendering is enabled
+- Markdown copy preserves raw markdown output (highlighting does not mutate stored raw text)
 
 ### Optional POS highlighting (EN)
 
@@ -110,16 +133,38 @@ API key resolution order:
 3. `LLM_API_KEY`
 4. Legacy fallback keys
 
+### Hero notices in `config.toml`
+
+App-level notices below the hero section are configured with `[[notices]]` entries:
+
+```toml
+[[notices]]
+enabled = true
+text = "New: Phase 2 refinement supports image + MP4 workflow"
+icon = ":material/rocket_launch:"
+color = "violet"
+```
+
+Notes:
+
+- `enabled` defaults to `true`
+- `text` (or `label`) is required
+- Supported `color`: `blue`, `green`, `orange`, `red`, `violet`, `gray`
+- Invalid/missing color falls back to `gray`
+- Each notice renders on its own centered line below the hero block
+
 ### Prompt selection precedence
 
-System prompt resolution:
+System prompt behavior:
 
-1. Manual override text (sidebar)
-2. Selected system preset content
-3. Config default system preset (`config.toml`)
-4. `system_prompt.txt` fallback
+- Source of truth is the editable **System Prompt** textbox in the sidebar.
+- System preset dropdown is a loader source via explicit **Load** action.
+- Initial textbox value at app start is populated from:
+  1. Config default system preset content (`config.toml`)
+  2. Otherwise selected system preset content
+  3. Otherwise `system_prompt.txt` fallback
 
-Initial prompt and correction notes:
+Initial prompt and refinement notes:
 
 - Source of truth is editable textbox content
 - Preset dropdown is a loader source via explicit **Load** action
@@ -154,7 +199,7 @@ Config defaults live in `[prompts]` in `config.toml`:
 system_dir = "prompts/system"
 initial_dir = "prompts/initial"
 correction_dir = "prompts/correction"
-default_system = "02_general_assist.txt"
+default_system = "10_frame_breakdown.txt"
 default_initial = "10_image_deepdive.txt"
 default_correction = "10_refine_with_image.txt"
 ```
@@ -163,19 +208,45 @@ default_correction = "10_refine_with_image.txt"
 
 ## Message/Conversation Contract
 
-Correction payload message order:
+### User media payload composition
+
+- Single-media behavior remains backward compatible:
+  - user text (if any)
+  - one `image_url` or `video_url` content item
+- Multi-media behavior (2+ items):
+  - user text (if any)
+  - for each media item, appended in-order as:
+    1. tag text (`Media tag: @... (source: filename)`)
+    2. media payload (`image_url` or `video_url`)
+- This ensures each media is explicitly paired with an alias/tag in both:
+  - Chat Completions payload
+  - Responses API-converted payload (`input_text` + `input_image/input_video`)
+
+Default media tags:
+
+- Images: `@image1`, `@image2`, ...
+- Videos: `@video1`, `@video2`, ...
+
+Users can edit these tags in the UI before submit.
+
+Refinement payload message order:
 
 1. `system` prompt (if provided)
-2. `user`: original image + additional context
+2. `user`: original media (single/multi) + additional context
 3. `assistant`: first output
-4. `user`: correction image + correction notes
+4. `user`: refinement media (single/multi) + refinement notes
 
 Session state keys:
 
 - `phase1_done`
 - `conversation_messages`
 - `phase1_output`, `phase1_reasoning`, `phase1_usage`
+- `phase1_edited_by_user`
 - `phase2_output`, `phase2_reasoning`, `phase2_usage`
+- `phase2_edited_by_user`
+- `prefer_responses_api`
+- `is_processing`, `pending_action`, `last_error`
+- `request_logging_enabled`, `request_logs`
 
 ---
 
@@ -200,9 +271,9 @@ Provider behavior varies in reasoning and usage stream fields; parsers are inten
 - **Media limits**:
   - Supported images: `png`, `jpg`, `jpeg`, `webp`
   - Supported video: `mp4`
-  - App-level MP4 limit: 20 MB (provider/Streamlit limits may be stricter)
+  - App-level MP4 limit: 30 MB (provider/Streamlit limits may be stricter)
 - **POS highlighting issues**:
-  - Ensure `spacy==3.8.2` and `en_core_web_sm` are installed
+  - Ensure dependencies are synced (`uv sync`) so `spacy==3.8.2` and `en_core_web_sm` are installed
   - Highlighting is English-oriented and may be imperfect for multilingual output
 
 ### Streamlit Cloud note (spaCy)

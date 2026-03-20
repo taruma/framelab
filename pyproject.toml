@@ -1,13 +1,26 @@
 [project]
 name = "framelab"
-version = "1.2.1"
-description = "FrameLab is a lightweight multimodal AI web app for cinematic image analysis."
+version = "2.0.0"
+description = "FrameLab is a lightweight multimodal AI analysis app for cinematic media with text, image, and video workflows."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
     "openai",
     "spacy==3.8.2",
     "streamlit",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0.0",
+]
+
+[tool.pytest.ini_options]
+addopts = "-q -m \"not live\""
+testpaths = ["tests"]
+markers = [
+    "live: optional live/provider-backed tests (excluded from default and CI unless explicitly enabled)",
 ]
 
 [tool.poetry]

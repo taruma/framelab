@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [2.0.0] - 2026-03-20
+
+### Added
+
+- Added optional text-only mode for both phases (media upload is no longer required).
+- Added multi-media upload support across Phase 1 and Phase 2 (single or multiple image/video files).
+- Added per-item media tagging with editable defaults (`@imageN` / `@videoN`) and tagged payload composition for multi-media requests.
+- Added a dedicated **Manage media tags** dialog with full-size preview and tag editing.
+- Added output editing dialogs for both Phase 1 and Phase 2, with edited content persisted to conversation context.
+- Added a large sidebar dialog editor for the System Prompt.
+- Added optional session request logging with JSON export download.
+- Added configurable hero notices via `config.toml`.
+- Added offline CI pytest coverage plus opt-in live smoke execution via `--live` and `.env` loading in tests.
+
+### Changed
+
+- Updated workflow terminology to **Primary Analysis** (Phase 1) and **Refinement Loop** (Phase 2).
+- Updated System Prompt behavior so the editable textbox is the request source of truth; preset dropdown now loads via explicit **Load** action.
+- Improved Request Transparency previews for multi-media payloads (media summaries and media-tag mapping).
+- Updated output copy actions to support both **Copy Plain Text** and **Copy Markdown**.
+- Updated phase headers and reasoning sections with Material icon labels.
+- Refined in-app notice content, including Xiaomi/OpenRouter update messaging.
+
+### Fixed
+
+- Fixed media-tag persistence to remain stable when media items are added/removed (signature-based mapping).
+- Improved setup reliability by bundling `en_core_web_sm` via dependency wheel and aligning guidance around `uv sync`.
+- Improved UI edit ergonomics by widening system prompt and phase-output edit dialogs.
+
+### Documentation
+
+- Updated `README.md`, `AGENTS.md`, `docs/REFERENCE.md`, and `docs/TESTING.md` to match current behavior and testing workflow.
+
 ## [1.2.1] - 2026-03-13
 
 ### Fixed

@@ -4,7 +4,8 @@
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square)
 
-**FrameLab** is a lightweight, multimodal AI analysis workbench designed for cinematic media. Whether you're analyzing composition, lighting, or technical optics, FrameLab provides a streamlined interface to get deep insights from your images and videos.
+**FrameLab** is a lightweight multimodal AI app for cinematic analysis.
+Bring text, images, or video, get streamed insights, then refine in a second pass.
 
 🌐 **Use it on the web:** [framelab.streamlit.app](https://framelab.streamlit.app)
 
@@ -22,118 +23,102 @@ https://github.com/user-attachments/assets/5dd8a80b-d9d8-4150-a4a5-7bdca75738cc
 
 ---
 
-## 🚀 Key Features
+## Why people use FrameLab
 
-### 🎬 Multimodal Analysis
-- **Image & Video Support**: Analyze images (PNG, JPG, WEBP) or MP4 videos up to 20MB.
-- **Two-Phase Workflow**: Start with an initial analysis and refine it with an optional correction loop.
-- **Cinematic Presets**: Built-in system prompts for film directors, script architects, and image critics.
-
-### 🛠️ Developer & Power User Tools
-- **Responses API Native**: Built to use the latest OpenAI Responses API with automatic fallback to Chat Completions.
-- **Request Transparency**: Peek under the hood with a live-updating payload preview before you send requests.
-- **Provider Presets**: Easily switch between OpenAI, Gemini, OpenRouter, BytePlus, or local endpoints via `config.toml`.
-- **Reasoning Stream**: View the model's "thought process" in real-time for reasoning-capable models.
-
-### 🎨 UI & Experience
-- **Live Streaming**: Real-time output rendering for immediate feedback.
-- **POS Highlighting**: Optional English Part-of-Speech highlighting (Verbs, Adjectives, Nouns) to help scan technical terminology.
-- **One-Click Copy**: Clean "Copy to Clipboard" buttons for raw analysis text.
+- **Text-only or multimodal** workflow (images/videos are optional)
+- **Two-phase flow**: Primary Analysis → Refinement Loop
+- **Live streaming output** with a Thought Process panel when available
+- **Prompt and output editing** directly in the UI
+- **Copy actions** for both plain text and markdown
+- **Provider flexibility** via OpenAI-compatible endpoints
 
 ---
 
-## ⚡ Quick Start
+## Quick Start
 
-FrameLab uses `uv` for fast dependency and runtime management.
+FrameLab uses [`uv`](https://docs.astral.sh/uv/) for dependency + runtime management.
 
-1. **Clone the repo:**
-   ```bash
-   git clone https://github.com/taruma/framelab.git
-   cd framelab
-   ```
+```bash
+git clone https://github.com/taruma/framelab.git
+cd framelab
+uv sync
+uv run run.py
+```
 
-2. **Install dependencies:**
-   ```bash
-   uv sync
-   ```
+Optional (recommended):
 
-3. **Set up your environment (optional but recommended):**
-   ```bash
-   # Windows (PowerShell / cmd)
-   copy .env.example .env
+```bash
+# Windows
+copy .env.example .env
 
-   # macOS / Linux
-   cp .env.example .env
-   ```
-   Then edit `.env` and add your `LLM_API_KEY`.
+# macOS / Linux
+cp .env.example .env
+```
 
-4. **Run the app:**
-   ```bash
-   uv run run.py
-   ```
+Then add your key to `.env` (for example `LLM_API_KEY=...`) or paste it in the sidebar at runtime.
 
 ---
 
-## 🕹️ How to Use
+## How it works
 
-### Step 1: Configuration (Sidebar)
-Configure your model settings in the sidebar. You can select from pre-configured **Providers** or manually override the API Key, Endpoint, and Model name.
+1. **Configure in the sidebar**
+   - Choose provider/model and set API key/endpoint as needed.
+   - Load a prompt preset, then edit it freely.
 
-### Step 2: Phase 1 — Initial Analysis
-Upload your **Original Reference Media**, select an **Initial Prompt** (or write your own), and click **Analyze**. FrameLab will stream a detailed technical breakdown.
+2. **Phase 1 — Primary Analysis**
+   - Add optional reference media + prompt/context, then click **Analyze**.
 
-### Step 3: Phase 2 — Correction Loop (Optional)
-If the analysis needs tweaking, upload a **Correction Image/Video** and provide **Correction Notes**. This sends the original context, the first answer, and your new media back to the model for a refined result.
-
----
-
-## ⚙️ Advanced Configuration
-
-### `config.toml`
-The core of FrameLab's provider system. Edit this file to add new models, change default endpoints, or point to different prompt directories.
-
-### Prompt Presets
-FrameLab loads templates from the `prompts/` directory. You can add your own `.txt` files to:
-- `prompts/system/` (System roles)
-- `prompts/initial/` (Initial analysis tasks)
-- `prompts/correction/` (Correction instructions)
-
-*(Optional: Add a `.meta.toml` file next to your `.txt` to customize the title and description in the UI.)*
-
-For deeper technical behavior (precedence rules, state contracts, fallback internals, troubleshooting), see [`docs/REFERENCE.md`](docs/REFERENCE.md).
+3. **Phase 2 — Refinement Loop**
+   - Add refinement notes and optional follow-up media to iterate on the result.
 
 ---
 
-## 🔬 Technical Notes
+## Prompt presets
 
-- **API Compatibility**: FrameLab defaults to the `client.responses.create` path. If your provider doesn't support it, the app automatically falls back to standard Chat Completions.
-- **POS Highlighting**: Uses `spaCy`. It's off by default and only loads the `en_core_web_sm` model if you enable highlighting in the UI.
-- **Session Memory**: Conversations are stored in Streamlit `session_state` and are cleared when you refresh the page.
-
----
-
-## 🛡️ License
-Distributed under the MIT License. See `LICENSE` for more information.
-
----
-
-## 🤝 Contributing
-
-Public contributions are welcome, especially around prompt quality and creative workflows.
-
-You can contribute by adding or improving presets in:
+You can customize behavior without editing app code:
 
 - `prompts/system/`
 - `prompts/initial/`
 - `prompts/correction/`
 
-Optional: include a matching `.meta.toml` file (same base name) to improve UI title/description/order.
-
-For technical/runtime details and behavior contracts, see [`docs/REFERENCE.md`](docs/REFERENCE.md).
+Optional: add `name.meta.toml` sidecars (`title`, `description`, `order`) for cleaner UI labels.
 
 ---
 
-Built with ❤️ by **Taruma Sakti** · Vibecoding with GPT-5.3-Codex
+## Documentation
+
+- [`docs/REFERENCE.md`](docs/REFERENCE.md) — technical/runtime details, advanced config, API behavior, contracts, troubleshooting
+- [`docs/TESTING.md`](docs/TESTING.md) — testing strategy and commands
+- [`CHANGELOG.md`](CHANGELOG.md) — release history and detailed changes
+- [`AGENTS.md`](AGENTS.md) — AI contributor/agent rules and architecture constraints
+
+---
+
+## License
+
+Distributed under the MIT License. See `LICENSE` for details.
+
+---
+
+Built with ❤️ by **Taruma Sakti** · Vibecoding with Cline + GPT-5.3-Codex
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

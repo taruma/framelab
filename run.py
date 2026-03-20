@@ -4,6 +4,7 @@ import json
 import sys
 import tomllib
 import html as html_lib
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Tuple
 
@@ -17,13 +18,17 @@ from app_state import (
     LAST_ERROR,
     PENDING_ACTION,
     PHASE1_DONE,
+    PHASE1_EDITED_BY_USER,
     PHASE1_OUTPUT,
     PHASE1_REASONING,
     PHASE1_USAGE,
+    PHASE2_EDITED_BY_USER,
     PHASE2_OUTPUT,
     PHASE2_REASONING,
     PHASE2_USAGE,
     PREFER_RESPONSES_API,
+    REQUEST_LOGGING_ENABLED,
+    REQUEST_LOGS,
     init_state,
 )
 from conversation import make_user_message
@@ -43,6 +48,7 @@ DEFAULT_APP_CONFIG = {
         "default_initial": "",
         "default_correction": "",
     },
+    "notices": [],
     "providers": {},
 }
 
@@ -52,7 +58,8 @@ SUPPORTED_IMAGE_TYPES = ["png", "jpg", "jpeg", "webp"]
 SUPPORTED_VIDEO_TYPES = ["mp4"]
 SUPPORTED_MEDIA_TYPES = SUPPORTED_IMAGE_TYPES + SUPPORTED_VIDEO_TYPES
 DEFAULT_INITIAL_PROMPT = "Analyze this reference image in highly detailed technical and creative terms."
-DEFAULT_CORRECTION_PROMPT = "Use this new image and correction notes to refine your previous analysis."
+DEFAULT_CORRECTION_PROMPT = "Use this new media and refinement notes to refine your previous analysis."
+ALLOWED_BADGE_COLORS = {"blue", "green", "orange", "red", "violet", "gray"}
 
 
 @st.cache_resource
@@ -150,14 +157,13 @@ def pos_highlight_to_markdown(text: str, highlight_pos_tags: set[str]) -> tuple[
         nlp = load_spacy_pos_tagger()
     except ImportError:
         return "", (
-            "spaCy is not installed. Run `uv add spacy`, then install model with "
-            "`uv run python -m spacy download en_core_web_sm`."
+            "spaCy is not installed. Run `uv sync` (or install dependencies) and retry."
         )
     except Exception as exc:
         if "Can't find model 'en_core_web_sm'" in str(exc):
             return "", (
-                "spaCy model `en_core_web_sm` is missing. Install it with "
-                "`uv run python -m spacy download en_core_web_sm`."
+                "spaCy model `en_core_web_sm` is missing. Run `uv sync` to install project "
+                "dependencies (including the model wheel), then retry."
             )
         return "", f"POS highlighter unavailable: {exc}"
 
@@ -209,9 +215,12 @@ def render_answer_with_optional_pos_highlight(
 
 
 def render_usage(usage: dict | None, placeholder: st.delta_generator.DeltaGenerator) -> None:
+    placeholder.caption(build_usage_caption(usage))
+
+
+def build_usage_caption(usage: dict | None) -> str:
     if not usage:
-        placeholder.caption("Usage: not returned by this model/provider.")
-        return
+        return "Usage: not returned by this model/provider."
 
     input_tokens = usage.get("input_tokens")
     output_tokens = usage.get("output_tokens")
@@ -225,7 +234,7 @@ def render_usage(usage: dict | None, placeholder: st.delta_generator.DeltaGenera
     if isinstance(total_tokens, int):
         parts.append(f"total: {total_tokens}")
 
-    placeholder.caption(" · ".join(parts))
+    return " · ".join(parts)
 
 
 def one_line(text: str) -> str:
@@ -242,6 +251,68 @@ def truncate_words(text: str, limit: int = TRANSPARENCY_PREVIEW_WORDS) -> str:
     return " ".join(words[:limit]) + " ..."
 
 
+def sanitize_payload_for_session_log(payload: Any) -> Any:
+    if isinstance(payload, dict):
+        return {k: sanitize_payload_for_session_log(v) for k, v in payload.items()}
+    if isinstance(payload, list):
+        return [sanitize_payload_for_session_log(item) for item in payload]
+    if isinstance(payload, tuple):
+        return [sanitize_payload_for_session_log(item) for item in payload]
+    if isinstance(payload, str) and payload.startswith("data:") and ";base64," in payload:
+        prefix = payload.split(";base64,", 1)[0]
+        return f"{prefix};base64,[omitted]"
+    return payload
+
+
+def collect_media_filenames(media_items: list[dict[str, Any]]) -> list[str]:
+    names: list[str] = []
+    for item in media_items:
+        name = str(item.get("name", "")).strip()
+        if name:
+            names.append(name)
+    return names
+
+
+def append_request_attempt_logs(
+    *,
+    phase: str,
+    provider_label: str,
+    endpoint: str,
+    attempt_logs: list[dict[str, Any]],
+    media_filenames: list[str],
+    started_at: str,
+    finished_at: str,
+) -> None:
+    if not st.session_state.get(REQUEST_LOGGING_ENABLED):
+        return
+    if not attempt_logs:
+        return
+
+    existing_logs = st.session_state.get(REQUEST_LOGS, [])
+    if not isinstance(existing_logs, list):
+        existing_logs = []
+
+    for idx, attempt in enumerate(attempt_logs, start=1):
+        existing_logs.append(
+            {
+                "timestamp": finished_at,
+                "phase": phase,
+                "attempt_index": idx,
+                "attempt_total": len(attempt_logs),
+                "transport": attempt.get("transport", ""),
+                "provider": provider_label,
+                "endpoint": endpoint,
+                "media_filenames": media_filenames,
+                "request_started_at": started_at,
+                "request_finished_at": finished_at,
+                "request": sanitize_payload_for_session_log(attempt.get("request")),
+                "response": attempt.get("response"),
+            }
+        )
+
+    st.session_state[REQUEST_LOGS] = existing_logs
+
+
 def transparency_chip(label: str, color: str, content: str) -> str:
     safe_content = html_lib.escape(content)
     return (
@@ -256,6 +327,243 @@ def get_media_kind(uploaded_file: Any) -> str:
         return "not selected"
     mime = getattr(uploaded_file, "type", "") or ""
     return "video" if mime.startswith("video/") else "image"
+
+
+def normalize_uploaded_files(uploaded_files: Any) -> list[Any]:
+    if uploaded_files is None:
+        return []
+    if isinstance(uploaded_files, list):
+        return [f for f in uploaded_files if f is not None]
+    return [uploaded_files]
+
+
+def build_default_media_tags(uploaded_files: list[Any]) -> list[str]:
+    image_count = 0
+    video_count = 0
+    tags: list[str] = []
+
+    for uploaded in uploaded_files:
+        if get_media_kind(uploaded) == "video":
+            video_count += 1
+            tags.append(f"@video{video_count}")
+        else:
+            image_count += 1
+            tags.append(f"@image{image_count}")
+
+    return tags
+
+
+def summarize_media_kind(uploaded_files: Any) -> str:
+    files = normalize_uploaded_files(uploaded_files)
+    if not files:
+        return "not selected"
+    if len(files) == 1:
+        return get_media_kind(files[0])
+
+    image_count = sum(1 for f in files if get_media_kind(f) == "image")
+    video_count = len(files) - image_count
+    parts: list[str] = []
+    if image_count:
+        parts.append(f"{image_count} image{'s' if image_count > 1 else ''}")
+    if video_count:
+        parts.append(f"{video_count} video{'s' if video_count > 1 else ''}")
+
+    return f"{len(files)} items ({', '.join(parts)})"
+
+
+def summarize_media_tag_map(media_items: list[dict[str, Any]]) -> str:
+    if len(media_items) <= 1:
+        return ""
+
+    pairs: list[str] = []
+    for item in media_items:
+        tag = str(item.get("tag", "")).strip()
+        kind = str(item.get("kind", "media")).strip() or "media"
+        if tag:
+            pairs.append(f"{tag}={kind}")
+
+    return ", ".join(pairs)
+
+
+def find_duplicate_media_tags(media_items: list[dict[str, Any]]) -> list[str]:
+    seen: dict[str, str] = {}
+    duplicates: set[str] = set()
+
+    for item in media_items:
+        tag = str(item.get("tag", "")).strip()
+        if not tag:
+            continue
+
+        normalized = tag.lower()
+        if normalized in seen:
+            duplicates.add(seen[normalized])
+            duplicates.add(tag)
+        else:
+            seen[normalized] = tag
+
+    return sorted(duplicates)
+
+
+def make_media_signature(uploaded_file: Any) -> str:
+    return (
+        f"{getattr(uploaded_file, 'name', '')}:"
+        f"{getattr(uploaded_file, 'size', '')}:"
+        f"{getattr(uploaded_file, 'type', '')}"
+    )
+
+
+def merge_media_tag_map(
+    existing_tag_map: dict[str, str],
+    signatures: list[str],
+    default_tags: list[str],
+) -> dict[str, str]:
+    merged: dict[str, str] = {}
+    for idx, signature in enumerate(signatures):
+        existing = str(existing_tag_map.get(signature, "")).strip()
+        merged[signature] = existing or default_tags[idx]
+    return merged
+
+
+def collect_tagged_media_inputs(
+    uploaded_files: Any,
+    *,
+    phase_key_prefix: str,
+) -> list[dict[str, Any]]:
+    files = normalize_uploaded_files(uploaded_files)
+    default_tags = build_default_media_tags(files)
+
+    tag_map_key = f"{phase_key_prefix}_media_tag_map"
+    existing_tag_map = st.session_state.get(tag_map_key, {})
+    if not isinstance(existing_tag_map, dict):
+        existing_tag_map = {}
+
+    signatures = [make_media_signature(f) for f in files]
+    merged_tag_map = merge_media_tag_map(existing_tag_map, signatures, default_tags)
+    st.session_state[tag_map_key] = merged_tag_map
+
+    items: list[dict[str, Any]] = []
+    for idx, uploaded in enumerate(files):
+        kind = get_media_kind(uploaded)
+        source_name = str(getattr(uploaded, "name", "")).strip() or f"media_{idx + 1}"
+        signature = signatures[idx]
+        final_tag = merged_tag_map.get(signature, default_tags[idx])
+        items.append(
+            {
+                "file": uploaded,
+                "tag": final_tag,
+                "kind": kind,
+                "name": source_name,
+                "signature": signature,
+                "default_tag": default_tags[idx],
+            }
+        )
+
+    return items
+
+
+def render_multi_media_thumbnail_strip(media_items: list[dict[str, Any]]) -> None:
+    if not media_items:
+        return
+
+    col_count = min(4, len(media_items))
+    cols = st.columns(col_count, gap="small")
+
+    for idx, item in enumerate(media_items):
+        with cols[idx % col_count]:
+            if item["kind"] == "video":
+                st.markdown("🎬 **Video**")
+                st.caption(item["name"])
+            else:
+                st.image(item["file"], width=130)
+            st.caption(item["tag"])
+
+
+def media_dialog_input_key(phase_key_prefix: str, signature: str) -> str:
+    safe_signature = re.sub(r"[^a-zA-Z0-9_]", "_", signature)
+    return f"{phase_key_prefix}_media_dialog_tag_{safe_signature}"
+
+
+def clear_media_dialog_inputs(phase_key_prefix: str, media_items: list[dict[str, Any]]) -> None:
+    for item in media_items:
+        st.session_state.pop(media_dialog_input_key(phase_key_prefix, item["signature"]), None)
+
+
+def render_media_tag_dialog_body(
+    *,
+    phase_key_prefix: str,
+    media_items: list[dict[str, Any]],
+    ui_locked: bool,
+) -> None:
+    if not media_items:
+        st.info("No media uploaded.")
+        if st.button("Close", key=f"{phase_key_prefix}_media_dialog_close_empty", width="stretch"):
+            clear_media_dialog_inputs(phase_key_prefix, media_items)
+            st.rerun()
+        return
+
+    st.caption("Edit tags below. Full-size previews are shown in this dialog.")
+
+    for idx, item in enumerate(media_items):
+        st.markdown(f"**{idx + 1}. {item['name']}**")
+        if item["kind"] == "video":
+            st.video(item["file"])
+        else:
+            st.image(item["file"], width="stretch")
+
+        input_key = media_dialog_input_key(phase_key_prefix, item["signature"])
+        if input_key not in st.session_state:
+            st.session_state[input_key] = item["tag"]
+
+        st.text_input(
+            "Tag/annotation",
+            key=input_key,
+            disabled=ui_locked,
+            help="Used in request payload to reference this media item.",
+        )
+        st.divider()
+
+    apply_col, cancel_col = st.columns(2)
+    if apply_col.button("Apply tags", type="primary", disabled=ui_locked, width="stretch"):
+        updated_map: dict[str, str] = {}
+        for item in media_items:
+            input_key = media_dialog_input_key(phase_key_prefix, item["signature"])
+            typed = str(st.session_state.get(input_key, "")).strip()
+            updated_map[item["signature"]] = typed or item["default_tag"]
+        st.session_state[f"{phase_key_prefix}_media_tag_map"] = updated_map
+        clear_media_dialog_inputs(phase_key_prefix, media_items)
+        st.rerun()
+
+    if cancel_col.button("Cancel", disabled=ui_locked, width="stretch"):
+        clear_media_dialog_inputs(phase_key_prefix, media_items)
+        st.rerun()
+
+
+@st.dialog("Manage Phase 1 Media Tags")
+def manage_phase1_media_dialog(media_items: list[dict[str, Any]], ui_locked: bool) -> None:
+    render_media_tag_dialog_body(
+        phase_key_prefix="phase1",
+        media_items=media_items,
+        ui_locked=ui_locked,
+    )
+
+
+@st.dialog("Manage Phase 2 Media Tags")
+def manage_phase2_media_dialog(media_items: list[dict[str, Any]], ui_locked: bool) -> None:
+    render_media_tag_dialog_body(
+        phase_key_prefix="phase2",
+        media_items=media_items,
+        ui_locked=ui_locked,
+    )
+
+
+def make_request_media_input(media_items: list[dict[str, Any]]) -> Any:
+    if not media_items:
+        return None
+
+    if len(media_items) == 1:
+        return media_items[0]["file"]
+
+    return [{"file": item["file"], "tag": item.get("tag", "")} for item in media_items]
 
 
 def validate_media_size(uploaded_file: Any, max_video_size_mb: int = MAX_VIDEO_UPLOAD_MB) -> str:
@@ -280,6 +588,24 @@ def validate_media_size(uploaded_file: Any, max_video_size_mb: int = MAX_VIDEO_U
             f"Please upload an MP4 up to {max_video_size_mb} MB."
         )
     return ""
+
+
+def validate_media_sizes(uploaded_files: Any, max_video_size_mb: int = MAX_VIDEO_UPLOAD_MB) -> list[str]:
+    files = normalize_uploaded_files(uploaded_files)
+    errors: list[str] = []
+    for idx, uploaded in enumerate(files):
+        err = validate_media_size(uploaded, max_video_size_mb=max_video_size_mb)
+        if not err:
+            continue
+
+        if len(files) == 1:
+            errors.append(err)
+            continue
+
+        source_name = str(getattr(uploaded, "name", "")).strip() or f"media_{idx + 1}"
+        errors.append(f"{source_name}: {err}")
+
+    return errors
 
 
 def render_transparency_block(
@@ -319,6 +645,7 @@ def build_phase1_transparency_preview(
     system_prompt: str,
     initial_prompt: str,
     reference_media_kind: str,
+    reference_media_tags: str = "",
 ) -> tuple[dict[str, str], list[str]]:
     initial_user_text = initial_prompt.strip()
     meta = {
@@ -330,8 +657,10 @@ def build_phase1_transparency_preview(
     payload = [
         transparency_chip("system", "#60a5fa", truncate_words(system_prompt)),
         transparency_chip("reference media", "#f59e0b", reference_media_kind),
-        transparency_chip("prompt/context", "#34d399", truncate_words(initial_user_text)),
     ]
+    if reference_media_tags:
+        payload.append(transparency_chip("media tags", "#f97316", truncate_words(reference_media_tags)))
+    payload.append(transparency_chip("prompt/context", "#34d399", truncate_words(initial_user_text)))
     return meta, payload
 
 
@@ -344,6 +673,7 @@ def build_phase2_transparency_preview(
     phase1_output: str,
     correction_prompt: str,
     correction_media_kind: str,
+    correction_media_tags: str = "",
 ) -> tuple[dict[str, str], list[str]]:
     correction_text = correction_prompt.strip()
     meta = {
@@ -354,11 +684,13 @@ def build_phase2_transparency_preview(
     }
     payload = [
         transparency_chip("system", "#60a5fa", truncate_words(system_prompt)),
-        transparency_chip("reference media", "#f59e0b", "image/video"),
+        transparency_chip("reference context", "#f59e0b", "image/video/text"),
         transparency_chip("previous output", "#a78bfa", truncate_words(phase1_output)),
         transparency_chip("correction media", "#f59e0b", correction_media_kind),
-        transparency_chip("correction notes", "#34d399", truncate_words(correction_text)),
     ]
+    if correction_media_tags:
+        payload.append(transparency_chip("media tags", "#f97316", truncate_words(correction_media_tags)))
+    payload.append(transparency_chip("correction notes", "#34d399", truncate_words(correction_text)))
     return meta, payload
 
 
@@ -454,6 +786,23 @@ def pick_default_preset(options: list[dict], default_filename: str) -> dict | No
     return options[0]
 
 
+def resolve_default_system_prompt_text(
+    default_system_preset: dict | None,
+    selected_system_content: str,
+    file_prompt: str,
+) -> str:
+    if default_system_preset:
+        default_content = str(default_system_preset.get("content", "")).strip()
+        if default_content:
+            return default_content
+
+    selected_content = (selected_system_content or "").strip()
+    if selected_content:
+        return selected_content
+
+    return (file_prompt or "").strip()
+
+
 def init_textarea_state(key: str, initial_value: str) -> None:
     if key not in st.session_state:
         st.session_state[key] = initial_value
@@ -467,6 +816,38 @@ def load_hero(path: str = "hero.md") -> Tuple[str, str]:
         return "", f"Hero file not found: {path}"
     except OSError as exc:
         return "", f"Failed to read hero file ({path}): {exc}"
+
+
+def normalize_notice_color(raw_color: Any) -> str:
+    color = str(raw_color or "").strip().lower()
+    return color if color in ALLOWED_BADGE_COLORS else "gray"
+
+
+def build_notices_markdown_lines(notices: Any) -> list[str]:
+    if not isinstance(notices, list):
+        return []
+
+    badges: list[str] = []
+    for notice in notices:
+        if not isinstance(notice, dict):
+            continue
+
+        enabled = notice.get("enabled", True)
+        if enabled is False:
+            continue
+
+        text = str(notice.get("text", notice.get("label", ""))).strip()
+        if not text:
+            continue
+
+        icon = str(notice.get("icon", "")).strip()
+        color = normalize_notice_color(notice.get("color", "gray"))
+
+        content = f"{icon} {text}".strip() if icon else text
+        safe_content = _escape_streamlit_color_text(content)
+        badges.append(f":{color}-badge[{safe_content}]")
+
+    return badges
 
 
 def load_app_config(path: str = "config.toml") -> tuple[dict, str]:
@@ -526,35 +907,133 @@ def markdown_to_plain_text(text: str) -> str:
     return cleaned.strip()
 
 
-def render_copy_button(label: str, text: str, key: str) -> None:
-    copy_text = markdown_to_plain_text(text)
-    button_id = f"copy-btn-{key}"
+def render_copy_buttons(
+    plain_label: str,
+    raw_label: str,
+    text: str,
+    key: str,
+) -> None:
+    copy_text_plain = markdown_to_plain_text(text)
+    copy_text_raw = text or ""
+
+    plain_button_id = f"copy-btn-plain-{key}"
+    raw_button_id = f"copy-btn-raw-{key}"
     status_id = f"copy-status-{key}"
+
     st_html(
         f"""
-        <div style=\"display:flex;align-items:center;gap:8px;margin-top:4px;\">
-          <button id=\"{button_id}\" style=\"padding:0.35rem 0.7rem;border:1px solid #555;border-radius:0.4rem;background:#1f1f1f;color:#f3f3f3;cursor:pointer;\">{html_lib.escape(label)}</button>
+        <div style=\"display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;margin-top:6px;width:100%;\">
+          <div style=\"display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;\">
+            <button id=\"{plain_button_id}\" style=\"padding:0.35rem 0.7rem;border:1px solid #555;border-radius:0.4rem;background:#1f1f1f;color:#f3f3f3;cursor:pointer;\">{html_lib.escape(plain_label)}</button>
+            <button id=\"{raw_button_id}\" style=\"padding:0.35rem 0.7rem;border:1px solid #555;border-radius:0.4rem;background:#1f1f1f;color:#f3f3f3;cursor:pointer;\">{html_lib.escape(raw_label)}</button>
+          </div>
           <span id=\"{status_id}\" style=\"font-size:0.85rem;color:#6c757d;\"></span>
         </div>
         <script>
-          const textToCopy = {json.dumps(copy_text)};
-          const btn = document.getElementById({json.dumps(button_id)});
+          const textToCopyPlain = {json.dumps(copy_text_plain)};
+          const textToCopyRaw = {json.dumps(copy_text_raw)};
+          const plainBtn = document.getElementById({json.dumps(plain_button_id)});
+          const rawBtn = document.getElementById({json.dumps(raw_button_id)});
           const status = document.getElementById({json.dumps(status_id)});
-          if (btn && status) {{
-            btn.onclick = async () => {{
-              try {{
-                await navigator.clipboard.writeText(textToCopy);
-                status.textContent = 'Copied';
-              }} catch (e) {{
-                status.textContent = 'Copy failed';
-              }}
-              setTimeout(() => {{ status.textContent = ''; }}, 1200);
-            }};
+
+          async function copyWithStatus(textToCopy, successLabel) {{
+            if (!status) return;
+            try {{
+              await navigator.clipboard.writeText(textToCopy);
+              status.textContent = successLabel;
+            }} catch (e) {{
+              status.textContent = 'Copy failed';
+            }}
+            setTimeout(() => {{ status.textContent = ''; }}, 1200);
+          }}
+
+          if (plainBtn) {{
+            plainBtn.onclick = async () => copyWithStatus(textToCopyPlain, 'Copied plain text');
+          }}
+          if (rawBtn) {{
+            rawBtn.onclick = async () => copyWithStatus(textToCopyRaw, 'Copied as-is');
           }}
         </script>
         """,
-        height=44,
+        height=74,
     )
+
+
+@st.dialog("Edit System Prompt", width="large")
+def edit_system_prompt_dialog(ui_locked: bool) -> None:
+    st.text_area(
+        "Edit System Prompt",
+        key="system_prompt_edit_text",
+        height=420,
+        disabled=ui_locked,
+    )
+    apply_col, cancel_col = st.columns(2)
+    if apply_col.button(
+        "Apply",
+        type="primary",
+        key="apply_system_prompt_dialog",
+        disabled=ui_locked,
+        width="stretch",
+    ):
+        st.session_state["system_prompt_text"] = st.session_state.get("system_prompt_edit_text", "")
+        st.rerun()
+    if cancel_col.button(
+        "Cancel",
+        key="cancel_system_prompt_dialog",
+        disabled=ui_locked,
+        width="stretch",
+    ):
+        st.rerun()
+
+
+@st.dialog("Edit Phase 1 Output", width="large")
+def edit_phase1_output_dialog(ui_locked: bool) -> None:
+    st.text_area(
+        "Edit Phase 1 markdown output",
+        key="phase1_edit_text",
+        height=320,
+        disabled=ui_locked,
+    )
+    submit_col, cancel_col = st.columns(2)
+    if submit_col.button("Submit changes", type="primary", disabled=ui_locked, width="stretch"):
+        edited = st.session_state.get("phase1_edit_text", "")
+        st.session_state[PHASE1_OUTPUT] = edited
+        st.session_state[PHASE1_EDITED_BY_USER] = True
+
+        messages = st.session_state.get(CONVERSATION_MESSAGES, [])
+        for message in messages:
+            if message.get("role") == "assistant":
+                message["content"] = edited
+                break
+
+        st.rerun()
+    if cancel_col.button("Cancel", disabled=ui_locked, width="stretch"):
+        st.rerun()
+
+
+@st.dialog("Edit Phase 2 Output", width="large")
+def edit_phase2_output_dialog(ui_locked: bool) -> None:
+    st.text_area(
+        "Edit Phase 2 markdown output",
+        key="phase2_edit_text",
+        height=320,
+        disabled=ui_locked,
+    )
+    submit_col, cancel_col = st.columns(2)
+    if submit_col.button("Submit changes", type="primary", disabled=ui_locked, width="stretch"):
+        edited = st.session_state.get("phase2_edit_text", "")
+        st.session_state[PHASE2_OUTPUT] = edited
+        st.session_state[PHASE2_EDITED_BY_USER] = True
+
+        messages = st.session_state.get(CONVERSATION_MESSAGES, [])
+        for idx in range(len(messages) - 1, -1, -1):
+            if messages[idx].get("role") == "assistant":
+                messages[idx]["content"] = edited
+                break
+
+        st.rerun()
+    if cancel_col.button("Cancel", disabled=ui_locked, width="stretch"):
+        st.rerun()
 
 
 def render() -> None:
@@ -571,6 +1050,14 @@ def render() -> None:
         st.markdown(hero_content, unsafe_allow_html=True)
     elif hero_error:
         st.warning(hero_error)
+
+    notices_markdown_lines = build_notices_markdown_lines(app_config.get("notices", []))
+    if notices_markdown_lines:
+        _, notices_center_col, _ = st.columns([1, 2.2, 1])
+        with notices_center_col:
+            for notice_line in notices_markdown_lines:
+                st.markdown(notice_line, width="stretch", text_alignment="center")
+
     st.divider()
 
     providers = app_config.get("providers", {})
@@ -693,56 +1180,125 @@ def render() -> None:
         selected_system_content = selected_system_preset["content"] if selected_system_preset else ""
         selected_system_description = selected_system_preset["description"] if selected_system_preset else ""
 
+        initial_system_prompt = resolve_default_system_prompt_text(
+            default_system_preset,
+            selected_system_content,
+            file_prompt,
+        )
+        init_textarea_state("system_prompt_text", initial_system_prompt)
+
+        load_system_clicked = st.button(
+            "Load",
+            key="load_system_preset",
+            disabled=ui_locked or not system_options,
+            help="Load selected preset into the System Prompt text box.",
+            width="stretch",
+        )
+
+        if load_system_clicked:
+            st.session_state["system_prompt_text"] = selected_system_content or file_prompt
+
         if selected_system_description:
             st.caption(selected_system_description)
 
-        system_prompt_override = st.text_area(
-            "System Prompt Override (optional)",
-            value="",
-            placeholder="Leave empty to use selected system preset",
+        system_prompt = st.text_area(
+            "System Prompt",
+            key="system_prompt_text",
             height=180,
             disabled=ui_locked,
         )
-        effective_system_prompt = system_prompt_override.strip() or selected_system_content or file_prompt
+        if st.button(
+            "Open large editor",
+            key="open_system_prompt_dialog",
+            disabled=ui_locked,
+            width="stretch",
+        ):
+            st.session_state["system_prompt_edit_text"] = st.session_state.get("system_prompt_text", "")
+            edit_system_prompt_dialog(ui_locked)
+
+        effective_system_prompt = system_prompt
 
         if system_presets_warning:
             st.warning(system_presets_warning)
-        if prompt_error and not selected_system_content:
+        if prompt_error and not system_options and not effective_system_prompt.strip():
             st.warning(prompt_error)
 
-        if selected_system_content:
-            st.caption(f"Loaded system prompt preset from `{system_dir}/{selected_system_file}`")
-        elif not prompt_error:
-            st.caption("Loaded fallback default system prompt from `system_prompt.txt`.")
+        st.divider()
+        st.markdown("#### Session Request Logging")
+        st.toggle(
+            "Enable request logging (session-only)",
+            key=REQUEST_LOGGING_ENABLED,
+            disabled=ui_locked,
+            help="Record sent request payloads and received responses for this browser session.",
+        )
 
-        st.caption(
-            "System prompt in use: "
-            f"{'Sidebar override' if system_prompt_override.strip() else ('Selected preset' if selected_system_content else 'system_prompt.txt fallback')}"
+        request_logs_for_download = st.session_state.get(REQUEST_LOGS, [])
+        if not isinstance(request_logs_for_download, list):
+            request_logs_for_download = []
+            st.session_state[REQUEST_LOGS] = request_logs_for_download
+
+        st.caption(f"Logged attempts: {len(request_logs_for_download)}")
+        st.download_button(
+            "Download Session Logs (.json)",
+            data=json.dumps(request_logs_for_download, ensure_ascii=False, indent=2),
+            file_name=f"framelab-session-logs-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json",
+            mime="application/json",
+            disabled=not request_logs_for_download,
+            width="stretch",
         )
 
     left_col, right_col = st.columns([1, 1.2], gap="large")
 
     with left_col:
-        st.subheader("Phase 1 · Initial Analysis")
+        st.subheader(":material/photo_camera: Phase 1 · Primary Analysis")
         original_image = st.file_uploader(
-            "Original Reference Media (image/video)",
+            "Original Reference Media (image/video, optional, one or more)",
             type=SUPPORTED_MEDIA_TYPES,
             key="original_image",
+            accept_multiple_files=True,
             disabled=ui_locked,
         )
         st.caption(
+            "Optional upload: you can use text-only chat mode, or include one or more media items for multimodal analysis. "
             "Allowed formats: image (PNG/JPG/JPEG/WEBP) or video (MP4 only). "
             f"App-enforced video limit: {MAX_VIDEO_UPLOAD_MB} MB. "
             "Image size follows provider/endpoint limits."
         )
-        phase1_media_error = validate_media_size(original_image)
-        if phase1_media_error:
-            st.error(phase1_media_error)
-        if original_image is not None:
-            if get_media_kind(original_image) == "video":
-                st.video(original_image)
+        phase1_media_errors = validate_media_sizes(original_image)
+        for media_error in phase1_media_errors:
+            st.error(media_error)
+
+        phase1_media_items = collect_tagged_media_inputs(
+            original_image,
+            phase_key_prefix="phase1",
+        )
+        if len(phase1_media_items) == 1:
+            single_item = phase1_media_items[0]
+            if single_item["kind"] == "video":
+                st.video(single_item["file"])
             else:
-                st.image(original_image, caption="Original image preview", width="stretch")
+                st.image(single_item["file"], caption="Original image preview", width="stretch")
+        elif len(phase1_media_items) > 1:
+            st.caption("Multiple media detected. Showing compact thumbnails; open dialog for full-size preview + tags.")
+            render_multi_media_thumbnail_strip(phase1_media_items)
+            if st.button(
+                "Manage media tags",
+                key="phase1_manage_media_tags",
+                disabled=ui_locked,
+                width="stretch",
+            ):
+                manage_phase1_media_dialog(phase1_media_items, ui_locked)
+
+        phase1_duplicate_tags = find_duplicate_media_tags(phase1_media_items)
+        if phase1_duplicate_tags:
+            st.warning(
+                "Duplicate media tags detected: "
+                + ", ".join(phase1_duplicate_tags)
+                + ". Duplicate tags may reduce clarity in model references."
+            )
+
+        phase1_media_kind_summary = summarize_media_kind(original_image)
+        phase1_media_tag_summary = summarize_media_tag_map(phase1_media_items)
         initial_options = [p["filename"] for p in initial_presets]
         default_initial_index = (
             initial_options.index(default_initial_preset["filename"])
@@ -796,7 +1352,8 @@ def render() -> None:
             reasoning=effective_reasoning_effort,
             system_prompt=effective_system_prompt,
             initial_prompt=effective_initial_prompt,
-            reference_media_kind=get_media_kind(original_image),
+            reference_media_kind=phase1_media_kind_summary,
+            reference_media_tags=phase1_media_tag_summary,
         )
         render_transparency_block(
             phase1_meta_preview,
@@ -807,7 +1364,7 @@ def render() -> None:
         analyze_clicked = st.button("Analyze", type="primary", width="stretch", disabled=ui_locked)
 
     with right_col:
-        st.subheader("Phase 1 Output")
+        st.subheader(":material/description: Phase 1 Output")
         phase1_highlight_enabled = st.checkbox(
             "Highlight POS (EN only): verbs / adjectives / nouns",
             key="phase1_pos_highlight",
@@ -826,12 +1383,10 @@ def render() -> None:
             disabled=not phase1_highlight_enabled,
         )
         phase1_selected_tags = {phase1_pos_options[label] for label in phase1_selected_labels}
-        phase1_thought_expander = st.expander("Thought Process", expanded=True)
+        phase1_thought_expander = st.expander(":material/psychology: Thought Process", expanded=True)
         phase1_thought_placeholder = phase1_thought_expander.empty()
         phase1_answer_placeholder = st.empty()
         phase1_pos_note_placeholder = st.empty()
-        phase1_usage_placeholder = st.empty()
-        phase1_copy_placeholder = st.empty()
 
         if st.session_state[PHASE1_REASONING]:
             phase1_thought_placeholder.markdown(st.session_state[PHASE1_REASONING])
@@ -843,13 +1398,23 @@ def render() -> None:
                 phase1_highlight_enabled,
                 phase1_selected_tags,
             )
-            render_usage(st.session_state[PHASE1_USAGE], phase1_usage_placeholder)
-            with phase1_copy_placeholder.container():
-                render_copy_button(
-                    "Copy Output (plain text)",
-                    st.session_state[PHASE1_OUTPUT],
-                    key="phase1_copy_button",
-                )
+            phase1_usage_col, phase1_edit_col = st.columns([8, 1.6], gap="small", vertical_alignment="center")
+            with phase1_usage_col:
+                usage_caption = build_usage_caption(st.session_state[PHASE1_USAGE])
+                if st.session_state[PHASE1_EDITED_BY_USER]:
+                    usage_caption += " · Edited by user"
+                st.caption(usage_caption)
+            with phase1_edit_col:
+                if st.button("✏️ Edit", key="phase1_edit_button", help="Edit output", disabled=ui_locked):
+                    st.session_state["phase1_edit_text"] = st.session_state[PHASE1_OUTPUT]
+                    edit_phase1_output_dialog(ui_locked)
+
+            render_copy_buttons(
+                "Copy Plain Text",
+                "Copy Markdown",
+                st.session_state[PHASE1_OUTPUT],
+                key="phase1_copy_button",
+            )
 
     if analyze_clicked and not ui_locked:
         if not effective_api_key:
@@ -858,10 +1423,7 @@ def render() -> None:
         if not effective_model:
             st.error("Please provide a model name.")
             return
-        if original_image is None:
-            st.error("Please upload an original reference media file.")
-            return
-        if phase1_media_error:
+        if phase1_media_errors:
             return
 
         st.session_state[LAST_ERROR] = ""
@@ -876,12 +1438,18 @@ def render() -> None:
             messages.append({"role": "system", "content": effective_system_prompt.strip()})
 
         initial_user_text = effective_initial_prompt.strip()
-
-        initial_user_message = make_user_message(original_image, initial_user_text)
+        initial_request_media = make_request_media_input(phase1_media_items)
+        initial_user_message = make_user_message(initial_request_media, initial_user_text)
         messages.append(initial_user_message)
+        phase1_attempt_logs: list[dict[str, Any]] = []
+        phase1_started_at = datetime.now().isoformat(timespec="seconds")
+        phase1_media_filenames = collect_media_filenames(phase1_media_items)
+
+        def phase1_attempt_logger(attempt: dict[str, Any]) -> None:
+            phase1_attempt_logs.append(attempt)
 
         try:
-            with st.spinner("Analyzing media..."):
+            with st.spinner("Generating response..."):
                 answer, thought, usage, prefer_responses_api = stream_response(
                     client,
                     effective_model,
@@ -890,9 +1458,9 @@ def render() -> None:
                     phase1_answer_placeholder,
                     reasoning_effort=effective_reasoning_effort,
                     prefer_responses_api=st.session_state[PREFER_RESPONSES_API],
+                    attempt_logger=phase1_attempt_logger,
                 )
             st.session_state[PREFER_RESPONSES_API] = prefer_responses_api
-            render_usage(usage, phase1_usage_placeholder)
             render_answer_with_optional_pos_highlight(
                 phase1_answer_placeholder,
                 phase1_pos_note_placeholder,
@@ -900,14 +1468,27 @@ def render() -> None:
                 phase1_highlight_enabled,
                 phase1_selected_tags,
             )
-            with phase1_copy_placeholder.container():
-                render_copy_button("Copy Output (plain text)", answer, key="phase1_copy_button")
+            phase1_usage_col, phase1_edit_col = st.columns([8, 1.6], gap="small", vertical_alignment="center")
+            with phase1_usage_col:
+                st.caption(build_usage_caption(usage))
+            with phase1_edit_col:
+                if st.button("✏️ Edit", key="phase1_edit_button_stream", help="Edit output", disabled=ui_locked):
+                    st.session_state["phase1_edit_text"] = answer
+                    edit_phase1_output_dialog(ui_locked)
+            render_copy_buttons(
+                "Copy Plain Text",
+                "Copy Markdown",
+                answer,
+                key="phase1_copy_button",
+            )
 
             st.session_state[PHASE1_DONE] = True
             st.session_state[PHASE1_OUTPUT] = answer
+            st.session_state[PHASE1_EDITED_BY_USER] = False
             st.session_state[PHASE1_REASONING] = thought
             st.session_state[PHASE1_USAGE] = usage
             st.session_state[PHASE2_OUTPUT] = ""
+            st.session_state[PHASE2_EDITED_BY_USER] = False
             st.session_state[PHASE2_REASONING] = ""
             st.session_state[PHASE2_USAGE] = None
 
@@ -917,6 +1498,16 @@ def render() -> None:
         except Exception as exc:
             st.session_state[LAST_ERROR] = f"Analyze failed: {exc}"
         finally:
+            phase1_finished_at = datetime.now().isoformat(timespec="seconds")
+            append_request_attempt_logs(
+                phase="phase1",
+                provider_label=str(selected_provider_label),
+                endpoint=effective_base_url,
+                attempt_logs=phase1_attempt_logs,
+                media_filenames=phase1_media_filenames,
+                started_at=phase1_started_at,
+                finished_at=phase1_finished_at,
+            )
             st.session_state[PENDING_ACTION] = None
             st.session_state[IS_PROCESSING] = False
             st.rerun()
@@ -926,26 +1517,55 @@ def render() -> None:
         corr_left, corr_right = st.columns([1, 1.2], gap="large")
 
         with corr_left:
-            st.subheader("Phase 2 · Correction Flow")
+            st.subheader(":material/sync_alt: Phase 2 · Refinement Loop")
             correction_image = st.file_uploader(
-                "Upload the generated/incorrect media (image/video)",
+                "Upload the generated/incorrect media (image/video, optional, one or more)",
                 type=SUPPORTED_MEDIA_TYPES,
                 key="correction_image",
+                accept_multiple_files=True,
                 disabled=ui_locked,
             )
             st.caption(
+                "Optional upload: you can submit text-only correction notes, or include one or more media items for multimodal refinement. "
                 "Allowed formats: image (PNG/JPG/JPEG/WEBP) or video (MP4 only). "
                 f"App-enforced video limit: {MAX_VIDEO_UPLOAD_MB} MB. "
                 "Image size follows provider/endpoint limits."
             )
-            phase2_media_error = validate_media_size(correction_image)
-            if phase2_media_error:
-                st.error(phase2_media_error)
-            if correction_image is not None:
-                if get_media_kind(correction_image) == "video":
-                    st.video(correction_image)
+            phase2_media_errors = validate_media_sizes(correction_image)
+            for media_error in phase2_media_errors:
+                st.error(media_error)
+
+            phase2_media_items = collect_tagged_media_inputs(
+                correction_image,
+                phase_key_prefix="phase2",
+            )
+            if len(phase2_media_items) == 1:
+                single_item = phase2_media_items[0]
+                if single_item["kind"] == "video":
+                    st.video(single_item["file"])
                 else:
-                    st.image(correction_image, caption="Correction image preview", width="stretch")
+                    st.image(single_item["file"], caption="Correction image preview", width="stretch")
+            elif len(phase2_media_items) > 1:
+                st.caption("Multiple media detected. Showing compact thumbnails; open dialog for full-size preview + tags.")
+                render_multi_media_thumbnail_strip(phase2_media_items)
+                if st.button(
+                    "Manage media tags",
+                    key="phase2_manage_media_tags",
+                    disabled=ui_locked,
+                    width="stretch",
+                ):
+                    manage_phase2_media_dialog(phase2_media_items, ui_locked)
+
+            phase2_duplicate_tags = find_duplicate_media_tags(phase2_media_items)
+            if phase2_duplicate_tags:
+                st.warning(
+                    "Duplicate media tags detected: "
+                    + ", ".join(phase2_duplicate_tags)
+                    + ". Duplicate tags may reduce clarity in model references."
+                )
+
+            phase2_media_kind_summary = summarize_media_kind(correction_image)
+            phase2_media_tag_summary = summarize_media_tag_map(phase2_media_items)
 
             correction_options = [p["filename"] for p in correction_presets]
             default_correction_index = (
@@ -956,7 +1576,7 @@ def render() -> None:
             correction_preset_col, correction_load_col = st.columns([5, 1.25], gap="small")
             with correction_preset_col:
                 selected_correction_file = st.selectbox(
-                    "Correction Notes Preset",
+                    "Refinement Notes Preset",
                     options=correction_options,
                     index=default_correction_index,
                     format_func=lambda fn: next((p["title"] for p in correction_presets if p["filename"] == fn), fn),
@@ -981,16 +1601,16 @@ def render() -> None:
                     "Load",
                     key="load_correction_preset",
                     disabled=ui_locked or not correction_options,
-                    help="Load selected preset into the Correction Notes text box.",
+                    help="Load selected preset into the Refinement Notes text box.",
                     width="stretch",
                 )
             if load_correction_clicked:
                 st.session_state["correction_notes_text"] = selected_correction_content or DEFAULT_CORRECTION_PROMPT
 
             correction_notes = st.text_area(
-                "Correction Notes",
+                "Refinement Notes",
                 key="correction_notes_text",
-                placeholder="Describe exactly how the model should correct the prior analysis.",
+                placeholder="Describe how the model should refine or revise the prior analysis.",
                 height=120,
                 disabled=ui_locked,
             )
@@ -1005,7 +1625,8 @@ def render() -> None:
                 system_prompt=effective_system_prompt,
                 phase1_output=st.session_state[PHASE1_OUTPUT],
                 correction_prompt=effective_correction_notes,
-                correction_media_kind=get_media_kind(correction_image),
+                correction_media_kind=phase2_media_kind_summary,
+                correction_media_tags=phase2_media_tag_summary,
             )
             render_transparency_block(
                 phase2_meta_preview,
@@ -1013,10 +1634,10 @@ def render() -> None:
                 key="phase2_transparency_preview",
             )
 
-            correction_clicked = st.button("Submit Correction", width="stretch", disabled=ui_locked)
+            correction_clicked = st.button("Run Refinement", width="stretch", disabled=ui_locked)
 
         with corr_right:
-            st.subheader("Updated Analysis")
+            st.subheader(":material/auto_awesome: Refined Analysis")
             phase2_highlight_enabled = st.checkbox(
                 "Highlight POS (EN only): verbs / adjectives / nouns",
                 key="phase2_pos_highlight",
@@ -1035,12 +1656,10 @@ def render() -> None:
                 disabled=not phase2_highlight_enabled,
             )
             phase2_selected_tags = {phase2_pos_options[label] for label in phase2_selected_labels}
-            phase2_thought_expander = st.expander("Thought Process", expanded=True)
+            phase2_thought_expander = st.expander(":material/psychology: Thought Process", expanded=True)
             phase2_thought_placeholder = phase2_thought_expander.empty()
             phase2_answer_placeholder = st.empty()
             phase2_pos_note_placeholder = st.empty()
-            phase2_usage_placeholder = st.empty()
-            phase2_copy_placeholder = st.empty()
 
             if st.session_state[PHASE2_REASONING]:
                 phase2_thought_placeholder.markdown(st.session_state[PHASE2_REASONING])
@@ -1052,13 +1671,23 @@ def render() -> None:
                     phase2_highlight_enabled,
                     phase2_selected_tags,
                 )
-                render_usage(st.session_state[PHASE2_USAGE], phase2_usage_placeholder)
-                with phase2_copy_placeholder.container():
-                    render_copy_button(
-                        "Copy Updated Analysis (plain text)",
-                        st.session_state[PHASE2_OUTPUT],
-                        key="phase2_copy_button",
-                    )
+                phase2_usage_col, phase2_edit_col = st.columns([8, 1.6], gap="small", vertical_alignment="center")
+                with phase2_usage_col:
+                    usage_caption = build_usage_caption(st.session_state[PHASE2_USAGE])
+                    if st.session_state[PHASE2_EDITED_BY_USER]:
+                        usage_caption += " · Edited by user"
+                    st.caption(usage_caption)
+                with phase2_edit_col:
+                    if st.button("✏️ Edit", key="phase2_edit_button", help="Edit output", disabled=ui_locked):
+                        st.session_state["phase2_edit_text"] = st.session_state[PHASE2_OUTPUT]
+                        edit_phase2_output_dialog(ui_locked)
+
+                render_copy_buttons(
+                    "Copy Plain Text",
+                    "Copy Markdown",
+                    st.session_state[PHASE2_OUTPUT],
+                    key="phase2_copy_button",
+                )
 
         if correction_clicked and not ui_locked:
             if not effective_api_key:
@@ -1067,10 +1696,7 @@ def render() -> None:
             if not effective_model:
                 st.error("Please provide a model name.")
                 return
-            if correction_image is None:
-                st.error("Please upload a correction media file.")
-                return
-            if phase2_media_error:
+            if phase2_media_errors:
                 return
 
             st.session_state[LAST_ERROR] = ""
@@ -1082,14 +1708,20 @@ def render() -> None:
             client = OpenAI(api_key=effective_api_key, base_url=effective_base_url)
 
             correction_text = effective_correction_notes.strip()
-
-            correction_user_message = make_user_message(correction_image, correction_text)
+            correction_request_media = make_request_media_input(phase2_media_items)
+            correction_user_message = make_user_message(correction_request_media, correction_text)
 
             messages = list(st.session_state[CONVERSATION_MESSAGES])
             messages.append(correction_user_message)
+            phase2_attempt_logs: list[dict[str, Any]] = []
+            phase2_started_at = datetime.now().isoformat(timespec="seconds")
+            phase2_media_filenames = collect_media_filenames(phase2_media_items)
+
+            def phase2_attempt_logger(attempt: dict[str, Any]) -> None:
+                phase2_attempt_logs.append(attempt)
 
             try:
-                with st.spinner("Applying correction..."):
+                with st.spinner("Running refinement..."):
                     answer, thought, usage, prefer_responses_api = stream_response(
                         client,
                         effective_model,
@@ -1098,9 +1730,9 @@ def render() -> None:
                         phase2_answer_placeholder,
                         reasoning_effort=effective_reasoning_effort,
                         prefer_responses_api=st.session_state[PREFER_RESPONSES_API],
+                        attempt_logger=phase2_attempt_logger,
                     )
                 st.session_state[PREFER_RESPONSES_API] = prefer_responses_api
-                render_usage(usage, phase2_usage_placeholder)
                 render_answer_with_optional_pos_highlight(
                     phase2_answer_placeholder,
                     phase2_pos_note_placeholder,
@@ -1108,21 +1740,39 @@ def render() -> None:
                     phase2_highlight_enabled,
                     phase2_selected_tags,
                 )
-                with phase2_copy_placeholder.container():
-                    render_copy_button(
-                        "Copy Updated Analysis (plain text)",
-                        answer,
-                        key="phase2_copy_button",
-                    )
+                phase2_usage_col, phase2_edit_col = st.columns([8, 1.6], gap="small", vertical_alignment="center")
+                with phase2_usage_col:
+                    st.caption(build_usage_caption(usage))
+                with phase2_edit_col:
+                    if st.button("✏️ Edit", key="phase2_edit_button_stream", help="Edit output", disabled=ui_locked):
+                        st.session_state["phase2_edit_text"] = answer
+                        edit_phase2_output_dialog(ui_locked)
+                render_copy_buttons(
+                    "Copy Plain Text",
+                    "Copy Markdown",
+                    answer,
+                    key="phase2_copy_button",
+                )
 
                 messages.append({"role": "assistant", "content": answer})
                 st.session_state[CONVERSATION_MESSAGES] = messages
                 st.session_state[PHASE2_OUTPUT] = answer
+                st.session_state[PHASE2_EDITED_BY_USER] = False
                 st.session_state[PHASE2_REASONING] = thought
                 st.session_state[PHASE2_USAGE] = usage
             except Exception as exc:
                 st.session_state[LAST_ERROR] = f"Correction failed: {exc}"
             finally:
+                phase2_finished_at = datetime.now().isoformat(timespec="seconds")
+                append_request_attempt_logs(
+                    phase="phase2",
+                    provider_label=str(selected_provider_label),
+                    endpoint=effective_base_url,
+                    attempt_logs=phase2_attempt_logs,
+                    media_filenames=phase2_media_filenames,
+                    started_at=phase2_started_at,
+                    finished_at=phase2_finished_at,
+                )
                 st.session_state[PENDING_ACTION] = None
                 st.session_state[IS_PROCESSING] = False
                 st.rerun()

@@ -10,7 +10,7 @@ Build and maintain a **lightweight multimodal analysis app** that:
 
 1. Accepts a reference image or video + optional context
 2. Produces a detailed streamed analysis
-3. Supports a correction loop using a second image or video + correction notes
+3. Supports a refinement loop using a second image or video + refinement notes
 
 The app must remain easy to run and easy to modify.
 
@@ -34,8 +34,9 @@ Keep the current lightweight modular layout unless explicitly asked otherwise.
 
 - `run.py`
   - Streamlit UI layout and app bootstrap for `uv run run.py`
-  - Sidebar config handling (provider preset, API key, endpoint, model, reasoning effort, system prompt override)
+  - Sidebar config handling (provider preset, API key, endpoint, model, reasoning effort, editable system prompt + preset loader)
   - Phase 1/Phase 2 orchestration and usage rendering
+  - Optional session request logging + JSON export (session-only)
   - Per-phase Request Transparency preview and processing-state locking
   - Optional EN POS highlighting for outputs (Verb/Adjective/Noun) with lazy/cached spaCy model loading
 - `app_state.py`
@@ -63,14 +64,14 @@ Must preserve:
 - Phase 1 always visible.
 - Phase 2 visible **only** after Phase 1 is complete.
 - Per-phase **Request Transparency** expander (collapsed by default), with live-updating compact payload preview.
-- Editable prompt textboxes for Phase 1 (Initial Prompt) and Phase 2 (Correction Notes), with explicit preset load actions.
+- Editable prompt textboxes for System Prompt, Phase 1 (Initial Prompt), and Phase 2 (Refinement Notes), with explicit preset load actions.
 - Right-side output order:
   1) `Thought Process` expander
   2) final streamed response
   3) usage caption (when provided)
-- One-click copy buttons for Phase 1 and Phase 2 outputs (plain text).
+- Copy actions per output: **Copy Plain Text** and **Copy Markdown**.
 - Optional POS highlighting controls per output (EN only), with separate selection for Verb/Adjective/Noun.
-- Highlighted rendering must not modify stored raw outputs; copy remains plain text.
+- Highlighted rendering must not modify stored raw outputs; plain-text copy remains plain text and markdown copy remains raw markdown.
 - Streaming should feel live (incremental updates, not batch render).
 
 ---
@@ -83,21 +84,28 @@ Session keys currently used:
 - `conversation_messages`
 - `phase1_output`, `phase1_reasoning`
 - `phase1_usage`
+- `phase1_edited_by_user`
 - `phase2_output`, `phase2_reasoning`
 - `phase2_usage`
+- `phase2_edited_by_user`
+- `prefer_responses_api`
+- `is_processing`, `pending_action`, `last_error`
+- `request_logging_enabled`, `request_logs`
 
 Configuration/prompt precedence must remain:
 
 - API key resolution: sidebar input → provider env key (`config.toml`) → `LLM_API_KEY` → legacy fallback
-- System prompt resolution: manual override → selected system preset → config default system preset → `system_prompt.txt`
-- Initial prompt and correction notes source: editable textbox content (preset dropdown is loader input via explicit button)
+- System prompt source of truth: editable System Prompt textbox in the sidebar
+- System prompt preset dropdown is loader input via explicit Load button
+- System prompt textbox initial value precedence: config default system preset → selected system preset → `system_prompt.txt`
+- Initial prompt and refinement notes source: editable textbox content (preset dropdown is loader input via explicit button)
 
-Correction payload message order must remain:
+Refinement payload message order must remain:
 
 1. System prompt (if provided)
 2. User: original image + additional context
 3. Assistant: first output
-4. User: correction image + correction notes
+4. User: refinement image + refinement notes
 
 Any refactor must preserve this logic.
 
@@ -155,12 +163,12 @@ Before finishing any iteration, verify:
 - [ ] Phase 1 streams output live
 - [ ] Thought Process expander updates when reasoning stream exists
 - [ ] Phase 2 appears only after Phase 1
-- [ ] Correction call includes prior assistant output in context
+- [ ] Refinement call includes prior assistant output in context
 - [ ] Request Transparency expander is present per phase and payload preview updates with current inputs
-- [ ] Initial/Correction preset loading populates editable textboxes; manual edits remain user-controlled
-- [ ] Copy output buttons work for Phase 1 and Phase 2 plain-text results
+- [ ] System/Initial/Refinement preset loading populates editable textboxes; manual edits remain user-controlled
+- [ ] Copy actions work for Phase 1 and Phase 2 (Copy Plain Text + Copy Markdown)
 - [ ] POS highlighting is optional/default OFF, and per-tag selection (Verb/Adjective/Noun) works when enabled
-- [ ] Copy output remains plain text even when highlighted rendering is enabled
+- [ ] Copy Plain Text remains plain text and Copy Markdown preserves raw markdown when highlighting is enabled
 - [ ] Responses API path works, or fallback to Chat Completions works clearly
 - [ ] Usage caption behavior is correct (shown when available, fallback message otherwise)
 - [ ] `README.md` and `AGENTS.md` are up to date

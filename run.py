@@ -894,6 +894,33 @@ def render_copy_buttons(
     )
 
 
+@st.dialog("Edit System Prompt")
+def edit_system_prompt_dialog(ui_locked: bool) -> None:
+    st.text_area(
+        "Edit System Prompt",
+        key="system_prompt_edit_text",
+        height=420,
+        disabled=ui_locked,
+    )
+    apply_col, cancel_col = st.columns(2)
+    if apply_col.button(
+        "Apply",
+        type="primary",
+        key="apply_system_prompt_dialog",
+        disabled=ui_locked,
+        width="stretch",
+    ):
+        st.session_state["system_prompt_text"] = st.session_state.get("system_prompt_edit_text", "")
+        st.rerun()
+    if cancel_col.button(
+        "Cancel",
+        key="cancel_system_prompt_dialog",
+        disabled=ui_locked,
+        width="stretch",
+    ):
+        st.rerun()
+
+
 @st.dialog("Edit Phase 1 Output")
 def edit_phase1_output_dialog(ui_locked: bool) -> None:
     st.text_area(
@@ -1115,6 +1142,15 @@ def render() -> None:
             height=180,
             disabled=ui_locked,
         )
+        if st.button(
+            "Open large editor",
+            key="open_system_prompt_dialog",
+            disabled=ui_locked,
+            width="stretch",
+        ):
+            st.session_state["system_prompt_edit_text"] = st.session_state.get("system_prompt_text", "")
+            edit_system_prompt_dialog(ui_locked)
+
         effective_system_prompt = system_prompt
 
         if system_presets_warning:

@@ -89,3 +89,20 @@ def test_system_prompt_load_button_applies_selected_preset() -> None:
         .splitlines()[0]
     )
     assert system_prompt_text.value.strip().startswith(expected_start)
+
+
+def test_system_prompt_large_editor_button_seeds_dialog_text_from_sidebar_text() -> None:
+    app = AppTest.from_file("run.py")
+    app.run(timeout=20)
+
+    system_prompt_text = _find_textarea_by_key(app, "system_prompt_text")
+    assert system_prompt_text is not None
+    original_value = system_prompt_text.value
+
+    open_large_editor = _find_button_by_key(app, "open_system_prompt_dialog")
+    assert open_large_editor is not None
+
+    open_large_editor.click().run(timeout=20)
+
+    assert "system_prompt_edit_text" in app.session_state
+    assert app.session_state["system_prompt_edit_text"] == original_value

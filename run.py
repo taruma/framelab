@@ -17,9 +17,11 @@ from app_state import (
     LAST_ERROR,
     PENDING_ACTION,
     PHASE1_DONE,
+    PHASE1_EDITED_BY_USER,
     PHASE1_OUTPUT,
     PHASE1_REASONING,
     PHASE1_USAGE,
+    PHASE2_EDITED_BY_USER,
     PHASE2_OUTPUT,
     PHASE2_REASONING,
     PHASE2_USAGE,
@@ -611,6 +613,56 @@ def render_copy_buttons(
     )
 
 
+@st.dialog("Edit Phase 1 Output")
+def edit_phase1_output_dialog(ui_locked: bool) -> None:
+    st.text_area(
+        "Edit Phase 1 markdown output",
+        key="phase1_edit_text",
+        height=320,
+        disabled=ui_locked,
+    )
+    submit_col, cancel_col = st.columns(2)
+    if submit_col.button("Submit changes", type="primary", disabled=ui_locked, width="stretch"):
+        edited = st.session_state.get("phase1_edit_text", "")
+        st.session_state[PHASE1_OUTPUT] = edited
+        st.session_state[PHASE1_EDITED_BY_USER] = True
+
+        messages = st.session_state.get(CONVERSATION_MESSAGES, [])
+        for message in messages:
+            if message.get("role") == "assistant":
+                message["content"] = edited
+                break
+
+        st.rerun()
+    if cancel_col.button("Cancel", disabled=ui_locked, width="stretch"):
+        st.rerun()
+
+
+@st.dialog("Edit Phase 2 Output")
+def edit_phase2_output_dialog(ui_locked: bool) -> None:
+    st.text_area(
+        "Edit Phase 2 markdown output",
+        key="phase2_edit_text",
+        height=320,
+        disabled=ui_locked,
+    )
+    submit_col, cancel_col = st.columns(2)
+    if submit_col.button("Submit changes", type="primary", disabled=ui_locked, width="stretch"):
+        edited = st.session_state.get("phase2_edit_text", "")
+        st.session_state[PHASE2_OUTPUT] = edited
+        st.session_state[PHASE2_EDITED_BY_USER] = True
+
+        messages = st.session_state.get(CONVERSATION_MESSAGES, [])
+        for idx in range(len(messages) - 1, -1, -1):
+            if messages[idx].get("role") == "assistant":
+                messages[idx]["content"] = edited
+                break
+
+        st.rerun()
+    if cancel_col.button("Cancel", disabled=ui_locked, width="stretch"):
+        st.rerun()
+
+
 def render() -> None:
     st.set_page_config(page_title="FrameLab - Multimodal Analysis", layout="wide")
     init_state()
@@ -906,6 +958,13 @@ def render() -> None:
                 phase1_highlight_enabled,
                 phase1_selected_tags,
             )
+            if st.session_state[PHASE1_EDITED_BY_USER]:
+                st.caption("Edited by user")
+
+            if st.button("Edit output", key="phase1_edit_button", disabled=ui_locked):
+                st.session_state["phase1_edit_text"] = st.session_state[PHASE1_OUTPUT]
+                edit_phase1_output_dialog(ui_locked)
+
             render_usage(st.session_state[PHASE1_USAGE], phase1_usage_placeholder)
             with phase1_copy_placeholder.container():
                 render_copy_buttons(
@@ -971,9 +1030,11 @@ def render() -> None:
 
             st.session_state[PHASE1_DONE] = True
             st.session_state[PHASE1_OUTPUT] = answer
+            st.session_state[PHASE1_EDITED_BY_USER] = False
             st.session_state[PHASE1_REASONING] = thought
             st.session_state[PHASE1_USAGE] = usage
             st.session_state[PHASE2_OUTPUT] = ""
+            st.session_state[PHASE2_EDITED_BY_USER] = False
             st.session_state[PHASE2_REASONING] = ""
             st.session_state[PHASE2_USAGE] = None
 
@@ -1119,6 +1180,13 @@ def render() -> None:
                     phase2_highlight_enabled,
                     phase2_selected_tags,
                 )
+                if st.session_state[PHASE2_EDITED_BY_USER]:
+                    st.caption("Edited by user")
+
+                if st.button("Edit output", key="phase2_edit_button", disabled=ui_locked):
+                    st.session_state["phase2_edit_text"] = st.session_state[PHASE2_OUTPUT]
+                    edit_phase2_output_dialog(ui_locked)
+
                 render_usage(st.session_state[PHASE2_USAGE], phase2_usage_placeholder)
                 with phase2_copy_placeholder.container():
                     render_copy_buttons(
@@ -1184,6 +1252,7 @@ def render() -> None:
                 messages.append({"role": "assistant", "content": answer})
                 st.session_state[CONVERSATION_MESSAGES] = messages
                 st.session_state[PHASE2_OUTPUT] = answer
+                st.session_state[PHASE2_EDITED_BY_USER] = False
                 st.session_state[PHASE2_REASONING] = thought
                 st.session_state[PHASE2_USAGE] = usage
             except Exception as exc:

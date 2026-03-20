@@ -4,7 +4,14 @@
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square)
 
-**FrameLab** is a lightweight, multimodal AI analysis workbench designed for cinematic media. Whether you're analyzing composition, lighting, or technical optics, FrameLab provides a streamlined interface to get deep insights from your images and videos.
+**FrameLab** is a lightweight multimodal AI analysis workbench for cinematic media, supporting text-only or image/video workflows, live streaming output, and an iterative refinement loop.
+
+With FrameLab, you can quickly:
+- break down composition, lighting, color, staging, and camera intent from still frames,
+- analyze short video clips for motion, continuity, and sequence-level storytelling,
+- run text-only creative/technical ideation when you don’t want to upload media,
+- iterate on results with refinement notes and optional follow-up media,
+- keep prompts and outputs editable so your workflow stays flexible.
 
 🌐 **Use it on the web:** [framelab.streamlit.app](https://framelab.streamlit.app)
 
@@ -24,6 +31,17 @@ https://github.com/user-attachments/assets/5dd8a80b-d9d8-4150-a4a5-7bdca75738cc
 
 ## 🚀 Key Features
 
+### 🎯 What You Can Do with FrameLab
+
+- **Cinematic image critique**: Get detailed analysis of framing, lens feel, depth cues, contrast, and art direction signals.
+- **Video shot-level review**: Use MP4 clips to inspect pacing, blocking, transitions, and visual consistency.
+- **Prompt planning for creators**: Turn references into usable shot ideas, direction notes, or production-ready prompt language.
+- **Text-only analysis and brainstorming**: Use it as a pure assistant for concepting, revision strategy, and creative planning.
+- **Iterative refinement loop**: Start with a first pass, then refine with correction notes and additional media while preserving context.
+- **Provider-flexible experimentation**: Switch endpoints/models in the sidebar to compare behavior without changing your workflow.
+
+---
+
 ### 🎬 Multimodal Analysis
 - **Optional Media Input**: Use FrameLab as text-only chat, or attach one or more images/videos for multimodal analysis.
 - **Image & Video Support**: Analyze images (PNG, JPG, WEBP) or MP4 videos up to 30MB.
@@ -31,6 +49,7 @@ https://github.com/user-attachments/assets/5dd8a80b-d9d8-4150-a4a5-7bdca75738cc
 - **Compact Multi-Media UX**: For multi-media uploads, FrameLab shows compact thumbnails in the main flow and opens a full-size dialog for tag editing.
 - **Two-Phase Workflow**: Start with a primary analysis and refine it with an optional refinement loop.
 - **Cinematic Presets**: Built-in system prompts for film directors, script architects, and image critics.
+- **Prompt-First Workflow**: Every phase prompt is editable, so you can tune behavior without touching code.
 
 ### 🛠️ Developer & Power User Tools
 - **Responses API Native**: Built to use the latest OpenAI Responses API with automatic fallback to Chat Completions.
@@ -89,6 +108,27 @@ Optionally upload one or more **Original Reference Media** items, then select an
 
 ### Step 3: Phase 2 — Refinement Loop (Optional)
 If the analysis needs refinement, provide **Refinement Notes** and optionally upload one or more **Refinement Image/Video** items. This sends the original context, the first answer, and your refinement input (text-only or with media) back to the model for an improved result. If you edited the Phase 1 output, the refinement step uses that edited text as the prior assistant context.
+
+---
+
+## 🧩 Build Your Own Prompt System
+
+FrameLab is designed so you can shape model behavior without forking the codebase.
+
+- **System Prompt is user-controlled**: The sidebar System Prompt textbox is the active request source.
+- **Preset + edit workflow**: Load a preset, then modify it directly for your own style/goal.
+- **Per-phase instruction control**: Initial Prompt and Refinement Notes are both editable on every run.
+- **Reusable custom presets**: Add your own `.txt` files into:
+  - `prompts/system/`
+  - `prompts/initial/`
+  - `prompts/correction/`
+- **Optional preset metadata**: Add `name.meta.toml` sidecars (`title`, `description`, `order`) for cleaner UI labels.
+
+Simple pattern for building your own prompt system:
+1. Start from an existing system preset closest to your target style.
+2. Load it into the System Prompt textbox and customize tone/format/output constraints.
+3. Pair it with a tailored Initial Prompt for first-pass behavior.
+4. Use Refinement Notes templates to enforce your revision loop consistently.
 
 ---
 
@@ -184,6 +224,9 @@ For technical/runtime details and behavior contracts, see [`docs/REFERENCE.md`](
 ---
 
 Built with ❤️ by **Taruma Sakti** · Vibecoding with GPT-5.3-Codex
+
+
+
 
 
 

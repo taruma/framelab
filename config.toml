@@ -53,14 +53,14 @@ env_key = "MIMO_API_KEY"
 models = ["mimo-v2-flash", "mimo-v2-omni", "mimo-v2-pro"]
 
 [[notices]]
-enabled = false
-text = "News: Prompt presets for video analysis are now expanded"
+enabled = true
+text = "News: FrameLab v2.0: A Major Workflow Upgrade for Analysis & Refinement. https://github.com/taruma/framelab/releases/latest"
 icon = "📰"
 color = "blue"
 
 [[notices]]
 enabled = true
-text = "New Update: Xiaomi provider added; Mimo V2 Omni model now available on OpenRouter"
+text = "New Model: Xiaomi provider added; Mimo V2 Omni model now available via OpenRouter"
 icon = ":material/rocket_launch:"
 color = "green"
 

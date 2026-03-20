@@ -4,6 +4,7 @@ import json
 import sys
 import tomllib
 import html as html_lib
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Tuple
 
@@ -26,6 +27,8 @@ from app_state import (
     PHASE2_REASONING,
     PHASE2_USAGE,
     PREFER_RESPONSES_API,
+    REQUEST_LOGGING_ENABLED,
+    REQUEST_LOGS,
     init_state,
 )
 from conversation import make_user_message
@@ -246,6 +249,68 @@ def truncate_words(text: str, limit: int = TRANSPARENCY_PREVIEW_WORDS) -> str:
     if len(words) <= limit:
         return compact
     return " ".join(words[:limit]) + " ..."
+
+
+def sanitize_payload_for_session_log(payload: Any) -> Any:
+    if isinstance(payload, dict):
+        return {k: sanitize_payload_for_session_log(v) for k, v in payload.items()}
+    if isinstance(payload, list):
+        return [sanitize_payload_for_session_log(item) for item in payload]
+    if isinstance(payload, tuple):
+        return [sanitize_payload_for_session_log(item) for item in payload]
+    if isinstance(payload, str) and payload.startswith("data:") and ";base64," in payload:
+        prefix = payload.split(";base64,", 1)[0]
+        return f"{prefix};base64,[omitted]"
+    return payload
+
+
+def collect_media_filenames(media_items: list[dict[str, Any]]) -> list[str]:
+    names: list[str] = []
+    for item in media_items:
+        name = str(item.get("name", "")).strip()
+        if name:
+            names.append(name)
+    return names
+
+
+def append_request_attempt_logs(
+    *,
+    phase: str,
+    provider_label: str,
+    endpoint: str,
+    attempt_logs: list[dict[str, Any]],
+    media_filenames: list[str],
+    started_at: str,
+    finished_at: str,
+) -> None:
+    if not st.session_state.get(REQUEST_LOGGING_ENABLED):
+        return
+    if not attempt_logs:
+        return
+
+    existing_logs = st.session_state.get(REQUEST_LOGS, [])
+    if not isinstance(existing_logs, list):
+        existing_logs = []
+
+    for idx, attempt in enumerate(attempt_logs, start=1):
+        existing_logs.append(
+            {
+                "timestamp": finished_at,
+                "phase": phase,
+                "attempt_index": idx,
+                "attempt_total": len(attempt_logs),
+                "transport": attempt.get("transport", ""),
+                "provider": provider_label,
+                "endpoint": endpoint,
+                "media_filenames": media_filenames,
+                "request_started_at": started_at,
+                "request_finished_at": finished_at,
+                "request": sanitize_payload_for_session_log(attempt.get("request")),
+                "response": attempt.get("response"),
+            }
+        )
+
+    st.session_state[REQUEST_LOGS] = existing_logs
 
 
 def transparency_chip(label: str, color: str, content: str) -> str:
@@ -1158,6 +1223,30 @@ def render() -> None:
         if prompt_error and not system_options and not effective_system_prompt.strip():
             st.warning(prompt_error)
 
+        st.divider()
+        st.markdown("#### Session Request Logging")
+        st.toggle(
+            "Enable request logging (session-only)",
+            key=REQUEST_LOGGING_ENABLED,
+            disabled=ui_locked,
+            help="Record sent request payloads and received responses for this browser session.",
+        )
+
+        request_logs_for_download = st.session_state.get(REQUEST_LOGS, [])
+        if not isinstance(request_logs_for_download, list):
+            request_logs_for_download = []
+            st.session_state[REQUEST_LOGS] = request_logs_for_download
+
+        st.caption(f"Logged attempts: {len(request_logs_for_download)}")
+        st.download_button(
+            "Download Session Logs (.json)",
+            data=json.dumps(request_logs_for_download, ensure_ascii=False, indent=2),
+            file_name=f"framelab-session-logs-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json",
+            mime="application/json",
+            disabled=not request_logs_for_download,
+            width="stretch",
+        )
+
     left_col, right_col = st.columns([1, 1.2], gap="large")
 
     with left_col:
@@ -1352,6 +1441,12 @@ def render() -> None:
         initial_request_media = make_request_media_input(phase1_media_items)
         initial_user_message = make_user_message(initial_request_media, initial_user_text)
         messages.append(initial_user_message)
+        phase1_attempt_logs: list[dict[str, Any]] = []
+        phase1_started_at = datetime.now().isoformat(timespec="seconds")
+        phase1_media_filenames = collect_media_filenames(phase1_media_items)
+
+        def phase1_attempt_logger(attempt: dict[str, Any]) -> None:
+            phase1_attempt_logs.append(attempt)
 
         try:
             with st.spinner("Generating response..."):
@@ -1363,6 +1458,7 @@ def render() -> None:
                     phase1_answer_placeholder,
                     reasoning_effort=effective_reasoning_effort,
                     prefer_responses_api=st.session_state[PREFER_RESPONSES_API],
+                    attempt_logger=phase1_attempt_logger,
                 )
             st.session_state[PREFER_RESPONSES_API] = prefer_responses_api
             render_answer_with_optional_pos_highlight(
@@ -1402,6 +1498,16 @@ def render() -> None:
         except Exception as exc:
             st.session_state[LAST_ERROR] = f"Analyze failed: {exc}"
         finally:
+            phase1_finished_at = datetime.now().isoformat(timespec="seconds")
+            append_request_attempt_logs(
+                phase="phase1",
+                provider_label=str(selected_provider_label),
+                endpoint=effective_base_url,
+                attempt_logs=phase1_attempt_logs,
+                media_filenames=phase1_media_filenames,
+                started_at=phase1_started_at,
+                finished_at=phase1_finished_at,
+            )
             st.session_state[PENDING_ACTION] = None
             st.session_state[IS_PROCESSING] = False
             st.rerun()
@@ -1607,6 +1713,12 @@ def render() -> None:
 
             messages = list(st.session_state[CONVERSATION_MESSAGES])
             messages.append(correction_user_message)
+            phase2_attempt_logs: list[dict[str, Any]] = []
+            phase2_started_at = datetime.now().isoformat(timespec="seconds")
+            phase2_media_filenames = collect_media_filenames(phase2_media_items)
+
+            def phase2_attempt_logger(attempt: dict[str, Any]) -> None:
+                phase2_attempt_logs.append(attempt)
 
             try:
                 with st.spinner("Running refinement..."):
@@ -1618,6 +1730,7 @@ def render() -> None:
                         phase2_answer_placeholder,
                         reasoning_effort=effective_reasoning_effort,
                         prefer_responses_api=st.session_state[PREFER_RESPONSES_API],
+                        attempt_logger=phase2_attempt_logger,
                     )
                 st.session_state[PREFER_RESPONSES_API] = prefer_responses_api
                 render_answer_with_optional_pos_highlight(
@@ -1650,6 +1763,16 @@ def render() -> None:
             except Exception as exc:
                 st.session_state[LAST_ERROR] = f"Correction failed: {exc}"
             finally:
+                phase2_finished_at = datetime.now().isoformat(timespec="seconds")
+                append_request_attempt_logs(
+                    phase="phase2",
+                    provider_label=str(selected_provider_label),
+                    endpoint=effective_base_url,
+                    attempt_logs=phase2_attempt_logs,
+                    media_filenames=phase2_media_filenames,
+                    started_at=phase2_started_at,
+                    finished_at=phase2_finished_at,
+                )
                 st.session_state[PENDING_ACTION] = None
                 st.session_state[IS_PROCESSING] = False
                 st.rerun()

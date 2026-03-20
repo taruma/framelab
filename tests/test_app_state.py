@@ -21,6 +21,8 @@ def test_init_state_sets_expected_defaults(monkeypatch) -> None:
     assert fake_session[app_state.IS_PROCESSING] is False
     assert fake_session[app_state.PENDING_ACTION] is None
     assert fake_session[app_state.LAST_ERROR] == ""
+    assert fake_session[app_state.REQUEST_LOGGING_ENABLED] is False
+    assert fake_session[app_state.REQUEST_LOGS] == []
 
 
 def test_init_state_does_not_override_existing_values(monkeypatch) -> None:

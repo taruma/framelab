@@ -15,6 +15,8 @@ PREFER_RESPONSES_API = "prefer_responses_api"
 IS_PROCESSING = "is_processing"
 PENDING_ACTION = "pending_action"
 LAST_ERROR = "last_error"
+REQUEST_LOGGING_ENABLED = "request_logging_enabled"
+REQUEST_LOGS = "request_logs"
 
 
 def init_state() -> None:
@@ -33,6 +35,8 @@ def init_state() -> None:
         IS_PROCESSING: False,
         PENDING_ACTION: None,
         LAST_ERROR: "",
+        REQUEST_LOGGING_ENABLED: False,
+        REQUEST_LOGS: [],
     }
     for key, value in defaults.items():
         if key not in st.session_state:

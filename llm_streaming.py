@@ -1,4 +1,4 @@
-from typing import Any, Tuple
+from typing import Any, Callable, Tuple
 
 import streamlit as st
 from openai import OpenAI
@@ -145,6 +145,37 @@ def extract_response_deltas(event: Any) -> Tuple[str, str]:
     return text_delta, reasoning_delta
 
 
+def build_responses_request_kwargs(
+    model: str,
+    messages: list[dict[str, Any]],
+    reasoning_effort: str | None = None,
+) -> dict[str, Any]:
+    request_kwargs: dict[str, Any] = {
+        "model": model,
+        "input": messages_to_responses_input(messages),
+        "stream": True,
+    }
+    if reasoning_effort:
+        request_kwargs["reasoning"] = {"effort": reasoning_effort}
+    return request_kwargs
+
+
+def build_chat_request_kwargs(
+    model: str,
+    messages: list[dict[str, Any]],
+    reasoning_effort: str | None = None,
+) -> dict[str, Any]:
+    request_kwargs: dict[str, Any] = {
+        "model": model,
+        "messages": messages,
+        "stream": True,
+        "stream_options": {"include_usage": True},
+    }
+    if reasoning_effort:
+        request_kwargs["reasoning_effort"] = reasoning_effort
+    return request_kwargs
+
+
 def stream_via_responses_api(
     client: OpenAI,
     model: str,
@@ -152,18 +183,17 @@ def stream_via_responses_api(
     thought_placeholder: Any,
     answer_placeholder: Any,
     reasoning_effort: str | None = None,
+    request_kwargs: dict[str, Any] | None = None,
 ) -> Tuple[str, str, dict[str, int] | None]:
     answer = ""
     thought = ""
     usage: dict[str, int] | None = None
 
-    responses_request_kwargs: dict[str, Any] = {
-        "model": model,
-        "input": messages_to_responses_input(messages),
-        "stream": True,
-    }
-    if reasoning_effort:
-        responses_request_kwargs["reasoning"] = {"effort": reasoning_effort}
+    responses_request_kwargs = request_kwargs or build_responses_request_kwargs(
+        model,
+        messages,
+        reasoning_effort=reasoning_effort,
+    )
 
     stream = client.responses.create(**responses_request_kwargs)
 
@@ -195,19 +225,17 @@ def stream_via_chat_completions(
     thought_placeholder: Any,
     answer_placeholder: Any,
     reasoning_effort: str | None = None,
+    request_kwargs: dict[str, Any] | None = None,
 ) -> Tuple[str, str, dict[str, int] | None]:
     answer = ""
     thought = ""
     usage: dict[str, int] | None = None
 
-    request_kwargs: dict[str, Any] = {
-        "model": model,
-        "messages": messages,
-        "stream": True,
-        "stream_options": {"include_usage": True},
-    }
-    if reasoning_effort:
-        request_kwargs["reasoning_effort"] = reasoning_effort
+    request_kwargs = request_kwargs or build_chat_request_kwargs(
+        model,
+        messages,
+        reasoning_effort=reasoning_effort,
+    )
 
     stream = client.chat.completions.create(**request_kwargs)
 
@@ -240,19 +268,60 @@ def stream_response(
     answer_placeholder: Any,
     reasoning_effort: str | None = None,
     prefer_responses_api: bool = True,
+    attempt_logger: Callable[[dict[str, Any]], None] | None = None,
 ) -> Tuple[str, str, dict[str, int] | None, bool]:
     if not prefer_responses_api:
-        answer, thought, usage = stream_via_chat_completions(
-            client,
+        chat_request_kwargs = build_chat_request_kwargs(
             model,
             messages,
-            thought_placeholder,
-            answer_placeholder,
             reasoning_effort=reasoning_effort,
         )
-        st.caption("Transport: Chat Completions (Responses API disabled for this session)")
-        return answer, thought, usage, False
+        try:
+            answer, thought, usage = stream_via_chat_completions(
+                client,
+                model,
+                messages,
+                thought_placeholder,
+                answer_placeholder,
+                reasoning_effort=reasoning_effort,
+                request_kwargs=chat_request_kwargs,
+            )
+            if attempt_logger:
+                attempt_logger(
+                    {
+                        "transport": "chat_completions",
+                        "request": chat_request_kwargs,
+                        "response": {
+                            "answer": answer,
+                            "reasoning": thought,
+                            "usage": usage,
+                            "error": None,
+                        },
+                    }
+                )
+            st.caption("Transport: Chat Completions (Responses API disabled for this session)")
+            return answer, thought, usage, False
+        except Exception as chat_exc:
+            if attempt_logger:
+                attempt_logger(
+                    {
+                        "transport": "chat_completions",
+                        "request": chat_request_kwargs,
+                        "response": {
+                            "answer": "",
+                            "reasoning": "",
+                            "usage": None,
+                            "error": format_exception(chat_exc),
+                        },
+                    }
+                )
+            raise
 
+    responses_request_kwargs = build_responses_request_kwargs(
+        model,
+        messages,
+        reasoning_effort=reasoning_effort,
+    )
     try:
         answer, thought, usage = stream_via_responses_api(
             client,
@@ -261,10 +330,37 @@ def stream_response(
             thought_placeholder,
             answer_placeholder,
             reasoning_effort=reasoning_effort,
+            request_kwargs=responses_request_kwargs,
         )
+        if attempt_logger:
+            attempt_logger(
+                {
+                    "transport": "responses_api",
+                    "request": responses_request_kwargs,
+                    "response": {
+                        "answer": answer,
+                        "reasoning": thought,
+                        "usage": usage,
+                        "error": None,
+                    },
+                }
+            )
         st.caption("Transport: Responses API")
         return answer, thought, usage, True
     except Exception as responses_exc:
+        if attempt_logger:
+            attempt_logger(
+                {
+                    "transport": "responses_api",
+                    "request": responses_request_kwargs,
+                    "response": {
+                        "answer": "",
+                        "reasoning": "",
+                        "usage": None,
+                        "error": format_exception(responses_exc),
+                    },
+                }
+            )
         thought_placeholder.empty()
         answer_placeholder.empty()
         st.caption("Responses API failed on this endpoint/model. Falling back to Chat Completions.")
@@ -273,6 +369,11 @@ def stream_response(
         if not next_prefer_responses_api:
             st.caption("Responses API auto-disabled for this session due to provider schema mismatch.")
 
+    chat_request_kwargs = build_chat_request_kwargs(
+        model,
+        messages,
+        reasoning_effort=reasoning_effort,
+    )
     try:
         answer, thought, usage = stream_via_chat_completions(
             client,
@@ -281,10 +382,37 @@ def stream_response(
             thought_placeholder,
             answer_placeholder,
             reasoning_effort=reasoning_effort,
+            request_kwargs=chat_request_kwargs,
         )
+        if attempt_logger:
+            attempt_logger(
+                {
+                    "transport": "chat_completions",
+                    "request": chat_request_kwargs,
+                    "response": {
+                        "answer": answer,
+                        "reasoning": thought,
+                        "usage": usage,
+                        "error": None,
+                    },
+                }
+            )
         st.caption("Transport: Chat Completions fallback")
         return answer, thought, usage, next_prefer_responses_api
     except Exception as fallback_exc:
+        if attempt_logger:
+            attempt_logger(
+                {
+                    "transport": "chat_completions",
+                    "request": chat_request_kwargs,
+                    "response": {
+                        "answer": "",
+                        "reasoning": "",
+                        "usage": None,
+                        "error": format_exception(fallback_exc),
+                    },
+                }
+            )
         thought_placeholder.empty()
         answer_placeholder.empty()
         st.error("Both Responses API and Chat Completions fallback failed.")

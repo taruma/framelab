@@ -126,3 +126,65 @@ def test_stream_response_disables_responses_api_on_schema_mismatch(monkeypatch: 
     )
 
     assert prefer is False
+
+
+def test_stream_response_attempt_logger_records_single_success_attempt(monkeypatch: Any) -> None:
+    monkeypatch.setattr(llm_streaming.st, "caption", lambda *_args, **_kwargs: None)
+
+    monkeypatch.setattr(
+        llm_streaming,
+        "stream_via_responses_api",
+        lambda *args, **kwargs: ("responses-answer", "reasoning", {"total_tokens": 9}),
+    )
+
+    attempts: list[dict[str, Any]] = []
+    llm_streaming.stream_response(
+        client=object(),
+        model="m",
+        messages=[{"role": "user", "content": "hello"}],
+        thought_placeholder=object(),
+        answer_placeholder=object(),
+        prefer_responses_api=True,
+        attempt_logger=lambda payload: attempts.append(payload),
+    )
+
+    assert len(attempts) == 1
+    assert attempts[0]["transport"] == "responses_api"
+    assert attempts[0]["response"]["error"] is None
+    assert attempts[0]["response"]["answer"] == "responses-answer"
+
+
+def test_stream_response_attempt_logger_records_both_attempts_on_fallback(monkeypatch: Any) -> None:
+    class Placeholder:
+        def empty(self) -> None:
+            return None
+
+    monkeypatch.setattr(llm_streaming.st, "caption", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(llm_streaming.st, "warning", lambda *_args, **_kwargs: None)
+
+    def fail_responses(*args: Any, **kwargs: Any) -> tuple[str, str, dict[str, int] | None]:
+        raise RuntimeError("responses down")
+
+    monkeypatch.setattr(llm_streaming, "stream_via_responses_api", fail_responses)
+    monkeypatch.setattr(
+        llm_streaming,
+        "stream_via_chat_completions",
+        lambda *args, **kwargs: ("chat-answer", "", {"total_tokens": 4}),
+    )
+
+    attempts: list[dict[str, Any]] = []
+    llm_streaming.stream_response(
+        client=object(),
+        model="m",
+        messages=[{"role": "user", "content": "hello"}],
+        thought_placeholder=Placeholder(),
+        answer_placeholder=Placeholder(),
+        prefer_responses_api=True,
+        attempt_logger=lambda payload: attempts.append(payload),
+    )
+
+    assert len(attempts) == 2
+    assert attempts[0]["transport"] == "responses_api"
+    assert "responses down" in str(attempts[0]["response"]["error"])
+    assert attempts[1]["transport"] == "chat_completions"
+    assert attempts[1]["response"]["answer"] == "chat-answer"

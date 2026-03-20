@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from run import (
+    collect_media_filenames,
     build_phase1_transparency_preview,
     build_phase2_transparency_preview,
     build_default_media_tags,
@@ -10,6 +11,7 @@ from run import (
     merge_media_tag_map,
     markdown_to_plain_text,
     resolve_default_system_prompt_text,
+    sanitize_payload_for_session_log,
     summarize_media_kind,
     summarize_media_tag_map,
     truncate_words,
@@ -206,3 +208,43 @@ def test_resolve_default_system_prompt_text_falls_back_to_selected_then_file() -
 
     assert selected_resolved == "Selected system"
     assert file_resolved == "Fallback file"
+
+
+def test_sanitize_payload_for_session_log_redacts_base64_data_urls_recursively() -> None:
+    payload = {
+        "model": "gpt-5-mini",
+        "input": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": "hello"},
+                    {
+                        "type": "input_image",
+                        "image_url": "data:image/png;base64,AAAA1111",
+                    },
+                    {
+                        "type": "input_video",
+                        "video_url": "data:video/mp4;base64,BBBB2222",
+                    },
+                ],
+            }
+        ],
+    }
+
+    sanitized = sanitize_payload_for_session_log(payload)
+
+    assert sanitized["input"][0]["content"][0]["text"] == "hello"
+    assert sanitized["input"][0]["content"][1]["image_url"] == "data:image/png;base64,[omitted]"
+    assert sanitized["input"][0]["content"][2]["video_url"] == "data:video/mp4;base64,[omitted]"
+
+
+def test_collect_media_filenames_returns_names_only() -> None:
+    names = collect_media_filenames(
+        [
+            {"name": "scene_01.png", "tag": "@image1"},
+            {"name": "take_02.mp4", "tag": "@video1"},
+            {"name": "", "tag": "@image2"},
+        ]
+    )
+
+    assert names == ["scene_01.png", "take_02.mp4"]

@@ -34,7 +34,7 @@ Keep the current lightweight modular layout unless explicitly asked otherwise.
 
 - `run.py`
   - Streamlit UI layout and app bootstrap for `uv run run.py`
-  - Sidebar config handling (provider preset, API key, endpoint, model, reasoning effort, system prompt override)
+  - Sidebar config handling (provider preset, API key, endpoint, model, reasoning effort, editable system prompt + preset loader)
   - Phase 1/Phase 2 orchestration and usage rendering
   - Per-phase Request Transparency preview and processing-state locking
   - Optional EN POS highlighting for outputs (Verb/Adjective/Noun) with lazy/cached spaCy model loading
@@ -63,7 +63,7 @@ Must preserve:
 - Phase 1 always visible.
 - Phase 2 visible **only** after Phase 1 is complete.
 - Per-phase **Request Transparency** expander (collapsed by default), with live-updating compact payload preview.
-- Editable prompt textboxes for Phase 1 (Initial Prompt) and Phase 2 (Refinement Notes), with explicit preset load actions.
+- Editable prompt textboxes for System Prompt, Phase 1 (Initial Prompt), and Phase 2 (Refinement Notes), with explicit preset load actions.
 - Right-side output order:
   1) `Thought Process` expander
   2) final streamed response
@@ -89,7 +89,9 @@ Session keys currently used:
 Configuration/prompt precedence must remain:
 
 - API key resolution: sidebar input → provider env key (`config.toml`) → `LLM_API_KEY` → legacy fallback
-- System prompt resolution: manual override → selected system preset → config default system preset → `system_prompt.txt`
+- System prompt source of truth: editable System Prompt textbox in the sidebar
+- System prompt preset dropdown is loader input via explicit Load button
+- System prompt textbox initial value precedence: config default system preset → selected system preset → `system_prompt.txt`
 - Initial prompt and refinement notes source: editable textbox content (preset dropdown is loader input via explicit button)
 
 Refinement payload message order must remain:
@@ -157,7 +159,7 @@ Before finishing any iteration, verify:
 - [ ] Phase 2 appears only after Phase 1
 - [ ] Refinement call includes prior assistant output in context
 - [ ] Request Transparency expander is present per phase and payload preview updates with current inputs
-- [ ] Initial/Refinement preset loading populates editable textboxes; manual edits remain user-controlled
+- [ ] System/Initial/Refinement preset loading populates editable textboxes; manual edits remain user-controlled
 - [ ] Copy output buttons work for Phase 1 and Phase 2 plain-text results
 - [ ] POS highlighting is optional/default OFF, and per-tag selection (Verb/Adjective/Noun) works when enabled
 - [ ] Copy output remains plain text even when highlighted rendering is enabled

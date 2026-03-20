@@ -81,7 +81,7 @@ FrameLab uses `uv` for fast dependency and runtime management.
 ## 🕹️ How to Use
 
 ### Step 1: Configuration (Sidebar)
-Configure your model settings in the sidebar. You can select from pre-configured **Providers** or manually override the API Key, Endpoint, and Model name.
+Configure your model settings in the sidebar. You can select from pre-configured **Providers** or manually override the API Key, Endpoint, and Model name. The **System Prompt** textbox is directly editable and is the exact source used in requests; the preset dropdown plus **Load** button is a quick way to populate that textbox.
 
 ### Step 2: Phase 1 — Primary Analysis
 Optionally upload one or more **Original Reference Media** items, then select an **Initial Prompt** (or write your own), and click **Analyze**. You can run fully text-only (chat-style) or multimodal with media attached. For multi-media uploads, FrameLab shows compact thumbnails in the main panel, and a **Manage media tags** dialog provides full-size previews plus per-item tag editing before submission. After generation, you can click **Edit output** to adjust the markdown result in a dialog.
@@ -182,6 +182,7 @@ For technical/runtime details and behavior contracts, see [`docs/REFERENCE.md`](
 ---
 
 Built with ❤️ by **Taruma Sakti** · Vibecoding with GPT-5.3-Codex
+
 
 
 

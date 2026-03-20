@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved multi-media UX with compact thumbnail previews in the main panel and full-size preview + tag editing inside a dialog.
 - Fixed multi-media tag persistence so edited tags remain stable when files are added/removed (signature-based mapping).
 - Expanded test coverage for multi-media payload composition, media-tag helpers, and transparency preview contracts.
+- Updated System Prompt UX to match Initial/Refinement behavior:
+  - the editable **System Prompt** textbox is now the request source of truth
+  - system preset selection now uses explicit **Load** action to populate the textbox
+  - textbox initial value is prefilled from config default system preset, then selected preset, then `system_prompt.txt` fallback
 
 ### Changed
 

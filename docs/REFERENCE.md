@@ -121,12 +121,14 @@ API key resolution order:
 
 ### Prompt selection precedence
 
-System prompt resolution:
+System prompt behavior:
 
-1. Manual override text (sidebar)
-2. Selected system preset content
-3. Config default system preset (`config.toml`)
-4. `system_prompt.txt` fallback
+- Source of truth is the editable **System Prompt** textbox in the sidebar.
+- System preset dropdown is a loader source via explicit **Load** action.
+- Initial textbox value at app start is populated from:
+  1. Config default system preset content (`config.toml`)
+  2. Otherwise selected system preset content
+  3. Otherwise `system_prompt.txt` fallback
 
 Initial prompt and refinement notes:
 

@@ -721,6 +721,23 @@ def pick_default_preset(options: list[dict], default_filename: str) -> dict | No
     return options[0]
 
 
+def resolve_default_system_prompt_text(
+    default_system_preset: dict | None,
+    selected_system_content: str,
+    file_prompt: str,
+) -> str:
+    if default_system_preset:
+        default_content = str(default_system_preset.get("content", "")).strip()
+        if default_content:
+            return default_content
+
+    selected_content = (selected_system_content or "").strip()
+    if selected_content:
+        return selected_content
+
+    return (file_prompt or "").strip()
+
+
 def init_textarea_state(key: str, initial_value: str) -> None:
     if key not in st.session_state:
         st.session_state[key] = initial_value
@@ -877,7 +894,34 @@ def render_copy_buttons(
     )
 
 
-@st.dialog("Edit Phase 1 Output")
+@st.dialog("Edit System Prompt", width="large")
+def edit_system_prompt_dialog(ui_locked: bool) -> None:
+    st.text_area(
+        "Edit System Prompt",
+        key="system_prompt_edit_text",
+        height=420,
+        disabled=ui_locked,
+    )
+    apply_col, cancel_col = st.columns(2)
+    if apply_col.button(
+        "Apply",
+        type="primary",
+        key="apply_system_prompt_dialog",
+        disabled=ui_locked,
+        width="stretch",
+    ):
+        st.session_state["system_prompt_text"] = st.session_state.get("system_prompt_edit_text", "")
+        st.rerun()
+    if cancel_col.button(
+        "Cancel",
+        key="cancel_system_prompt_dialog",
+        disabled=ui_locked,
+        width="stretch",
+    ):
+        st.rerun()
+
+
+@st.dialog("Edit Phase 1 Output", width="large")
 def edit_phase1_output_dialog(ui_locked: bool) -> None:
     st.text_area(
         "Edit Phase 1 markdown output",
@@ -902,7 +946,7 @@ def edit_phase1_output_dialog(ui_locked: bool) -> None:
         st.rerun()
 
 
-@st.dialog("Edit Phase 2 Output")
+@st.dialog("Edit Phase 2 Output", width="large")
 def edit_phase2_output_dialog(ui_locked: bool) -> None:
     st.text_area(
         "Edit Phase 2 markdown output",
@@ -1071,32 +1115,48 @@ def render() -> None:
         selected_system_content = selected_system_preset["content"] if selected_system_preset else ""
         selected_system_description = selected_system_preset["description"] if selected_system_preset else ""
 
+        initial_system_prompt = resolve_default_system_prompt_text(
+            default_system_preset,
+            selected_system_content,
+            file_prompt,
+        )
+        init_textarea_state("system_prompt_text", initial_system_prompt)
+
+        load_system_clicked = st.button(
+            "Load",
+            key="load_system_preset",
+            disabled=ui_locked or not system_options,
+            help="Load selected preset into the System Prompt text box.",
+            width="stretch",
+        )
+
+        if load_system_clicked:
+            st.session_state["system_prompt_text"] = selected_system_content or file_prompt
+
         if selected_system_description:
             st.caption(selected_system_description)
 
-        system_prompt_override = st.text_area(
-            "System Prompt Override (optional)",
-            value="",
-            placeholder="Leave empty to use selected system preset",
+        system_prompt = st.text_area(
+            "System Prompt",
+            key="system_prompt_text",
             height=180,
             disabled=ui_locked,
         )
-        effective_system_prompt = system_prompt_override.strip() or selected_system_content or file_prompt
+        if st.button(
+            "Open large editor",
+            key="open_system_prompt_dialog",
+            disabled=ui_locked,
+            width="stretch",
+        ):
+            st.session_state["system_prompt_edit_text"] = st.session_state.get("system_prompt_text", "")
+            edit_system_prompt_dialog(ui_locked)
+
+        effective_system_prompt = system_prompt
 
         if system_presets_warning:
             st.warning(system_presets_warning)
-        if prompt_error and not selected_system_content:
+        if prompt_error and not system_options and not effective_system_prompt.strip():
             st.warning(prompt_error)
-
-        if selected_system_content:
-            st.caption(f"Loaded system prompt preset from `{system_dir}/{selected_system_file}`")
-        elif not prompt_error:
-            st.caption("Loaded fallback default system prompt from `system_prompt.txt`.")
-
-        st.caption(
-            "System prompt in use: "
-            f"{'Sidebar override' if system_prompt_override.strip() else ('Selected preset' if selected_system_content else 'system_prompt.txt fallback')}"
-        )
 
     left_col, right_col = st.columns([1, 1.2], gap="large")
 

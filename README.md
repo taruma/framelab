@@ -40,6 +40,7 @@ https://github.com/user-attachments/assets/5dd8a80b-d9d8-4150-a4a5-7bdca75738cc
 - **Live Streaming**: Real-time output rendering for immediate feedback.
 - **POS Highlighting**: Optional English Part-of-Speech highlighting (Verbs, Adjectives, Nouns) to help scan technical terminology.
 - **One-Click Copy**: Clean "Copy to Clipboard" buttons for raw analysis text.
+- **Editable Output (Dialog)**: Edit Phase 1 or Phase 2 markdown output in a simple Submit/Cancel dialog, while keeping the main view clean.
 
 ---
 
@@ -81,10 +82,10 @@ FrameLab uses `uv` for fast dependency and runtime management.
 Configure your model settings in the sidebar. You can select from pre-configured **Providers** or manually override the API Key, Endpoint, and Model name.
 
 ### Step 2: Phase 1 — Primary Analysis
-Optionally upload **Original Reference Media**, then select an **Initial Prompt** (or write your own), and click **Analyze**. You can run fully text-only (chat-style) or multimodal with media attached.
+Optionally upload **Original Reference Media**, then select an **Initial Prompt** (or write your own), and click **Analyze**. You can run fully text-only (chat-style) or multimodal with media attached. After generation, you can click **Edit output** to adjust the markdown result in a dialog.
 
 ### Step 3: Phase 2 — Refinement Loop (Optional)
-If the analysis needs refinement, provide **Refinement Notes** and optionally upload a **Refinement Image/Video**. This sends the original context, the first answer, and your refinement input (text-only or with media) back to the model for an improved result.
+If the analysis needs refinement, provide **Refinement Notes** and optionally upload a **Refinement Image/Video**. This sends the original context, the first answer, and your refinement input (text-only or with media) back to the model for an improved result. If you edited the Phase 1 output, the refinement step uses that edited text as the prior assistant context.
 
 ---
 
@@ -179,6 +180,7 @@ For technical/runtime details and behavior contracts, see [`docs/REFERENCE.md`](
 ---
 
 Built with ❤️ by **Taruma Sakti** · Vibecoding with GPT-5.3-Codex
+
 
 
 

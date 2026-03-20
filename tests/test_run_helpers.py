@@ -9,6 +9,7 @@ from run import (
     find_duplicate_media_tags,
     merge_media_tag_map,
     markdown_to_plain_text,
+    resolve_default_system_prompt_text,
     summarize_media_kind,
     summarize_media_tag_map,
     truncate_words,
@@ -179,3 +180,29 @@ def test_merge_media_tag_map_preserves_existing_and_assigns_defaults_to_new() ->
         "a.jpg:10:image/jpeg": "@character",
         "b.jpg:11:image/jpeg": "@image2",
     }
+
+
+def test_resolve_default_system_prompt_text_prefers_config_default_preset() -> None:
+    resolved = resolve_default_system_prompt_text(
+        default_system_preset={"content": "  Config default system  "},
+        selected_system_content="Selected system",
+        file_prompt="Fallback file",
+    )
+
+    assert resolved == "Config default system"
+
+
+def test_resolve_default_system_prompt_text_falls_back_to_selected_then_file() -> None:
+    selected_resolved = resolve_default_system_prompt_text(
+        default_system_preset=None,
+        selected_system_content="  Selected system  ",
+        file_prompt="Fallback file",
+    )
+    file_resolved = resolve_default_system_prompt_text(
+        default_system_preset=None,
+        selected_system_content="   ",
+        file_prompt="  Fallback file  ",
+    )
+
+    assert selected_resolved == "Selected system"
+    assert file_resolved == "Fallback file"

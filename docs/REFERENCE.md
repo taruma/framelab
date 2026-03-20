@@ -55,7 +55,7 @@ LLM_API_KEY=your_real_key
 
 ```bash
 uv init
-uv add streamlit openai spacy
+uv add streamlit openai spacy "en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl"
 uv run run.py
 ```
 
@@ -202,7 +202,7 @@ Provider behavior varies in reasoning and usage stream fields; parsers are inten
   - Supported video: `mp4`
   - App-level MP4 limit: 20 MB (provider/Streamlit limits may be stricter)
 - **POS highlighting issues**:
-  - Ensure `spacy==3.8.2` and `en_core_web_sm` are installed
+  - Ensure dependencies are synced (`uv sync`) so `spacy==3.8.2` and `en_core_web_sm` are installed
   - Highlighting is English-oriented and may be imperfect for multilingual output
 
 ### Streamlit Cloud note (spaCy)

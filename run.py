@@ -152,14 +152,13 @@ def pos_highlight_to_markdown(text: str, highlight_pos_tags: set[str]) -> tuple[
         nlp = load_spacy_pos_tagger()
     except ImportError:
         return "", (
-            "spaCy is not installed. Run `uv add spacy`, then install model with "
-            "`uv run python -m spacy download en_core_web_sm`."
+            "spaCy is not installed. Run `uv sync` (or install dependencies) and retry."
         )
     except Exception as exc:
         if "Can't find model 'en_core_web_sm'" in str(exc):
             return "", (
-                "spaCy model `en_core_web_sm` is missing. Install it with "
-                "`uv run python -m spacy download en_core_web_sm`."
+                "spaCy model `en_core_web_sm` is missing. Run `uv sync` to install project "
+                "dependencies (including the model wheel), then retry."
             )
         return "", f"POS highlighter unavailable: {exc}"
 

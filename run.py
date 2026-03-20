@@ -894,7 +894,7 @@ def render_copy_buttons(
     )
 
 
-@st.dialog("Edit System Prompt")
+@st.dialog("Edit System Prompt", width="large")
 def edit_system_prompt_dialog(ui_locked: bool) -> None:
     st.text_area(
         "Edit System Prompt",

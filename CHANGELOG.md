@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added multi-media upload support in both Phase 1 and Phase 2 (single or multiple image/video files).
+- Added per-item media tagging with editable defaults:
+  - images use `@image1`, `@image2`, ...
+  - videos use `@video1`, `@video2`, ...
+- Added tagged multi-media request composition where each media item is paired with adjacent tag text in the payload.
+
+### Changed
+
+- Preserved backward-compatible single-media message behavior while enabling tagged composition only for multi-media uploads.
+- Enhanced Request Transparency previews for multi-media mode with media-count summary and media-tag mapping chips.
+- Improved multi-media UX with compact thumbnail previews in the main panel and full-size preview + tag editing inside a dialog.
+- Fixed multi-media tag persistence so edited tags remain stable when files are added/removed (signature-based mapping).
+- Expanded test coverage for multi-media payload composition, media-tag helpers, and transparency preview contracts.
+
 ### Changed
 
 - Updated workflow terminology to better match current functionality:

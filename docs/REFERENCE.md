@@ -10,9 +10,9 @@ If you just want to run the app, start with [`README.md`](../README.md).
 
 FrameLab is a lightweight multimodal analysis app that:
 
-1. Accepts a reference image/video plus optional context
+1. Accepts one or more reference image/video items plus optional context
 2. Streams a detailed model analysis
-3. Supports an optional refinement loop with a second image/video + refinement notes
+3. Supports an optional refinement loop with one or more additional image/video items + refinement notes
 
 Primary run command:
 
@@ -67,7 +67,8 @@ uv run run.py
 
 - **Phase 1** is always visible.
 - **Phase 2** appears only after Phase 1 completes.
-- Both phases support image/video upload preview.
+- Both phases support image/video upload preview (single or multiple files).
+- For multi-media uploads, each item gets an editable tag/annotation field.
 
 ### Right-panel output order (per phase)
 
@@ -81,6 +82,8 @@ uv run run.py
 - Collapsed by default
 - Shows request metadata and compact payload preview
 - Preview is live-updated from current input state
+- For multiple media items, preview includes media summary + media-tag mapping chip.
+- For single media items, preview keeps legacy compact behavior (kind only).
 
 ### Copy behavior
 
@@ -163,12 +166,33 @@ default_correction = "10_refine_with_image.txt"
 
 ## Message/Conversation Contract
 
+### User media payload composition
+
+- Single-media behavior remains backward compatible:
+  - user text (if any)
+  - one `image_url` or `video_url` content item
+- Multi-media behavior (2+ items):
+  - user text (if any)
+  - for each media item, appended in-order as:
+    1. tag text (`Media tag: @... (source: filename)`)
+    2. media payload (`image_url` or `video_url`)
+- This ensures each media is explicitly paired with an alias/tag in both:
+  - Chat Completions payload
+  - Responses API-converted payload (`input_text` + `input_image/input_video`)
+
+Default media tags:
+
+- Images: `@image1`, `@image2`, ...
+- Videos: `@video1`, `@video2`, ...
+
+Users can edit these tags in the UI before submit.
+
 Refinement payload message order:
 
 1. `system` prompt (if provided)
-2. `user`: original image + additional context
+2. `user`: original media (single/multi) + additional context
 3. `assistant`: first output
-4. `user`: refinement image + refinement notes
+4. `user`: refinement media (single/multi) + refinement notes
 
 Session state keys:
 
@@ -200,7 +224,7 @@ Provider behavior varies in reasoning and usage stream fields; parsers are inten
 - **Media limits**:
   - Supported images: `png`, `jpg`, `jpeg`, `webp`
   - Supported video: `mp4`
-  - App-level MP4 limit: 20 MB (provider/Streamlit limits may be stricter)
+  - App-level MP4 limit: 30 MB (provider/Streamlit limits may be stricter)
 - **POS highlighting issues**:
   - Ensure dependencies are synced (`uv sync`) so `spacy==3.8.2` and `en_core_web_sm` are installed
   - Highlighting is English-oriented and may be imperfect for multilingual output

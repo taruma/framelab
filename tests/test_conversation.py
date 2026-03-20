@@ -57,6 +57,42 @@ def test_make_user_message_falls_back_when_no_text_and_no_media() -> None:
     }
 
 
+def test_make_user_message_with_multiple_media_includes_tag_text_pairs() -> None:
+    image = FakeUploadedFile(data=b"img", name="hero.jpg", type="image/jpeg")
+    video = FakeUploadedFile(data=b"vid", name="scene.mp4", type="video/mp4")
+
+    message = make_user_message(
+        [
+            {"file": image, "tag": "@character"},
+            {"file": video, "tag": "@video1"},
+        ],
+        "Use all references",
+    )
+
+    assert message["role"] == "user"
+    assert message["content"][0] == {"type": "text", "text": "Use all references"}
+    assert message["content"][1]["type"] == "text"
+    assert "Media tag: @character" in message["content"][1]["text"]
+    assert "hero.jpg" in message["content"][1]["text"]
+    assert message["content"][2]["type"] == "image_url"
+    assert message["content"][2]["image_url"]["url"].startswith("data:image/jpeg;base64,")
+    assert message["content"][3]["type"] == "text"
+    assert "Media tag: @video1" in message["content"][3]["text"]
+    assert "scene.mp4" in message["content"][3]["text"]
+    assert message["content"][4]["type"] == "video_url"
+    assert message["content"][4]["video_url"]["url"].startswith("data:video/mp4;base64,")
+
+
+def test_make_user_message_single_media_list_keeps_legacy_behavior_without_tag_line() -> None:
+    image = FakeUploadedFile(data=b"img", name="solo.jpg", type="image/jpeg")
+
+    message = make_user_message([{"file": image, "tag": "@character"}], "Analyze")
+
+    assert message["content"][0] == {"type": "text", "text": "Analyze"}
+    assert message["content"][1]["type"] == "image_url"
+    assert len(message["content"]) == 2
+
+
 def test_messages_to_responses_input_converts_roles_text_and_media() -> None:
     messages = [
         {"role": "system", "content": "You are helpful"},

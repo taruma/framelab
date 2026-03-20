@@ -22,7 +22,7 @@ Goal: keep tests **simple, fast, and useful** for regression safety when adding/
 
 - `tests/test_conversation.py`
   - `to_data_url`
-  - `make_user_message`
+  - `make_user_message` (single-media backward compatibility + multi-media tagged payload pairs)
   - `messages_to_responses_input`
 - `tests/test_llm_streaming_parsers.py`
   - usage normalization
@@ -33,7 +33,7 @@ Goal: keep tests **simple, fast, and useful** for regression safety when adding/
   - fallback to Chat Completions
   - auto-disable behavior for known provider schema mismatch
 - `tests/test_run_helpers.py`
-  - helper contracts (`truncate_words`, `validate_media_size`, markdown plain-text conversion, transparency preview builders)
+  - helper contracts (`truncate_words`, `validate_media_size(s)`, markdown plain-text conversion, transparency preview builders, media-tag helper summaries)
 - `tests/test_app_state.py`
   - session key defaults and non-overwrite behavior
 
@@ -102,6 +102,20 @@ When changing behavior, keep regression safety strong:
 1. New feature → add/update at least one test.
 2. Bug fix → add regression test that covers the bug scenario.
 3. Any message/fallback/state contract change → update corresponding contract tests.
+
+## Multi-media tagging regression scenarios (offline)
+
+When changing media-related behavior, ensure tests cover:
+
+1. **Single-media backward compatibility**
+   - message payload still uses legacy compact media composition for one item.
+2. **Multi-media tagged composition**
+   - payload alternates `text(tag)` + `image_url/video_url` per item.
+3. **Tag helper behavior**
+   - default tag generation (`@imageN`/`@videoN`), duplicate-tag detection, and summary formatting.
+4. **Transparency preview contracts**
+   - single media keeps legacy chip count/shape.
+   - multi-media adds media-tags chip.
 
 ## CI policy
 

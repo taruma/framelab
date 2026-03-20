@@ -10,17 +10,58 @@ def to_data_url(uploaded_file: Any) -> str:
     return f"data:{mime};base64,{encoded}"
 
 
-def make_user_message(image_file: Any, text: str) -> dict[str, Any]:
+def _as_media_items(media_input: Any) -> list[dict[str, Any]]:
+    if media_input is None:
+        return []
+
+    if isinstance(media_input, list):
+        normalized: list[dict[str, Any]] = []
+        for item in media_input:
+            if item is None:
+                continue
+            if isinstance(item, dict) and item.get("file") is not None:
+                normalized.append(
+                    {
+                        "file": item.get("file"),
+                        "tag": str(item.get("tag", "")).strip(),
+                    }
+                )
+            else:
+                normalized.append({"file": item, "tag": ""})
+        return normalized
+
+    return [{"file": media_input, "tag": ""}]
+
+
+def make_user_message(media_input: Any, text: str) -> dict[str, Any]:
     content = []
     if text.strip():
         content.append({"type": "text", "text": text.strip()})
-    if image_file is not None:
-        media_mime = image_file.type or mimetypes.guess_type(image_file.name)[0] or ""
-        media_url = to_data_url(image_file)
+
+    media_items = _as_media_items(media_input)
+    multi_media_mode = len(media_items) > 1
+
+    for index, media_item in enumerate(media_items):
+        media_file = media_item.get("file")
+        if media_file is None:
+            continue
+
+        media_mime = media_file.type or mimetypes.guess_type(media_file.name)[0] or ""
+        media_url = to_data_url(media_file)
+
+        if multi_media_mode:
+            tag = str(media_item.get("tag", "")).strip() or f"@media{index + 1}"
+            source_name = str(getattr(media_file, "name", "")).strip()
+            tag_text = f"Media tag: {tag}"
+            if source_name:
+                tag_text += f" (source: {source_name})"
+            content.append({"type": "text", "text": tag_text})
+
         if media_mime.startswith("video/"):
             content.append({"type": "video_url", "video_url": {"url": media_url}})
         else:
             content.append({"type": "image_url", "image_url": {"url": media_url}})
+
     if not content:
         content.append({"type": "text", "text": "No extra text provided."})
     return {"role": "user", "content": content}

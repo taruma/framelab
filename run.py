@@ -264,6 +264,141 @@ def get_media_kind(uploaded_file: Any) -> str:
     return "video" if mime.startswith("video/") else "image"
 
 
+def normalize_uploaded_files(uploaded_files: Any) -> list[Any]:
+    if uploaded_files is None:
+        return []
+    if isinstance(uploaded_files, list):
+        return [f for f in uploaded_files if f is not None]
+    return [uploaded_files]
+
+
+def build_default_media_tags(uploaded_files: list[Any]) -> list[str]:
+    image_count = 0
+    video_count = 0
+    tags: list[str] = []
+
+    for uploaded in uploaded_files:
+        if get_media_kind(uploaded) == "video":
+            video_count += 1
+            tags.append(f"@video{video_count}")
+        else:
+            image_count += 1
+            tags.append(f"@image{image_count}")
+
+    return tags
+
+
+def summarize_media_kind(uploaded_files: Any) -> str:
+    files = normalize_uploaded_files(uploaded_files)
+    if not files:
+        return "not selected"
+    if len(files) == 1:
+        return get_media_kind(files[0])
+
+    image_count = sum(1 for f in files if get_media_kind(f) == "image")
+    video_count = len(files) - image_count
+    parts: list[str] = []
+    if image_count:
+        parts.append(f"{image_count} image{'s' if image_count > 1 else ''}")
+    if video_count:
+        parts.append(f"{video_count} video{'s' if video_count > 1 else ''}")
+
+    return f"{len(files)} items ({', '.join(parts)})"
+
+
+def summarize_media_tag_map(media_items: list[dict[str, Any]]) -> str:
+    if len(media_items) <= 1:
+        return ""
+
+    pairs: list[str] = []
+    for item in media_items:
+        tag = str(item.get("tag", "")).strip()
+        kind = str(item.get("kind", "media")).strip() or "media"
+        if tag:
+            pairs.append(f"{tag}={kind}")
+
+    return ", ".join(pairs)
+
+
+def find_duplicate_media_tags(media_items: list[dict[str, Any]]) -> list[str]:
+    seen: dict[str, str] = {}
+    duplicates: set[str] = set()
+
+    for item in media_items:
+        tag = str(item.get("tag", "")).strip()
+        if not tag:
+            continue
+
+        normalized = tag.lower()
+        if normalized in seen:
+            duplicates.add(seen[normalized])
+            duplicates.add(tag)
+        else:
+            seen[normalized] = tag
+
+    return sorted(duplicates)
+
+
+def collect_tagged_media_inputs(
+    uploaded_files: Any,
+    *,
+    phase_key_prefix: str,
+    ui_locked: bool,
+    image_caption_prefix: str,
+) -> list[dict[str, Any]]:
+    files = normalize_uploaded_files(uploaded_files)
+    default_tags = build_default_media_tags(files)
+
+    signature_key = f"{phase_key_prefix}_media_signatures"
+    signatures = [
+        f"{getattr(f, 'name', '')}:{getattr(f, 'size', '')}:{getattr(f, 'type', '')}"
+        for f in files
+    ]
+    if st.session_state.get(signature_key) != signatures:
+        for idx, default_tag in enumerate(default_tags):
+            st.session_state[f"{phase_key_prefix}_media_tag_{idx}"] = default_tag
+        st.session_state[signature_key] = signatures
+
+    items: list[dict[str, Any]] = []
+    for idx, uploaded in enumerate(files):
+        kind = get_media_kind(uploaded)
+        source_name = str(getattr(uploaded, "name", "")).strip() or f"media_{idx + 1}"
+
+        if kind == "video":
+            st.video(uploaded)
+        else:
+            st.image(uploaded, caption=f"{image_caption_prefix} image {idx + 1} preview", width="stretch")
+
+        tag_key = f"{phase_key_prefix}_media_tag_{idx}"
+        tag_input = st.text_input(
+            f"Tag/annotation for {kind} {idx + 1}",
+            key=tag_key,
+            disabled=ui_locked,
+            help="Used in request payload to reference this media item.",
+        )
+        final_tag = (tag_input or "").strip() or default_tags[idx]
+        items.append(
+            {
+                "file": uploaded,
+                "tag": final_tag,
+                "kind": kind,
+                "name": source_name,
+            }
+        )
+
+    return items
+
+
+def make_request_media_input(media_items: list[dict[str, Any]]) -> Any:
+    if not media_items:
+        return None
+
+    if len(media_items) == 1:
+        return media_items[0]["file"]
+
+    return [{"file": item["file"], "tag": item.get("tag", "")} for item in media_items]
+
+
 def validate_media_size(uploaded_file: Any, max_video_size_mb: int = MAX_VIDEO_UPLOAD_MB) -> str:
     if uploaded_file is None:
         return ""
@@ -286,6 +421,24 @@ def validate_media_size(uploaded_file: Any, max_video_size_mb: int = MAX_VIDEO_U
             f"Please upload an MP4 up to {max_video_size_mb} MB."
         )
     return ""
+
+
+def validate_media_sizes(uploaded_files: Any, max_video_size_mb: int = MAX_VIDEO_UPLOAD_MB) -> list[str]:
+    files = normalize_uploaded_files(uploaded_files)
+    errors: list[str] = []
+    for idx, uploaded in enumerate(files):
+        err = validate_media_size(uploaded, max_video_size_mb=max_video_size_mb)
+        if not err:
+            continue
+
+        if len(files) == 1:
+            errors.append(err)
+            continue
+
+        source_name = str(getattr(uploaded, "name", "")).strip() or f"media_{idx + 1}"
+        errors.append(f"{source_name}: {err}")
+
+    return errors
 
 
 def render_transparency_block(
@@ -325,6 +478,7 @@ def build_phase1_transparency_preview(
     system_prompt: str,
     initial_prompt: str,
     reference_media_kind: str,
+    reference_media_tags: str = "",
 ) -> tuple[dict[str, str], list[str]]:
     initial_user_text = initial_prompt.strip()
     meta = {
@@ -336,8 +490,10 @@ def build_phase1_transparency_preview(
     payload = [
         transparency_chip("system", "#60a5fa", truncate_words(system_prompt)),
         transparency_chip("reference media", "#f59e0b", reference_media_kind),
-        transparency_chip("prompt/context", "#34d399", truncate_words(initial_user_text)),
     ]
+    if reference_media_tags:
+        payload.append(transparency_chip("media tags", "#f97316", truncate_words(reference_media_tags)))
+    payload.append(transparency_chip("prompt/context", "#34d399", truncate_words(initial_user_text)))
     return meta, payload
 
 
@@ -350,6 +506,7 @@ def build_phase2_transparency_preview(
     phase1_output: str,
     correction_prompt: str,
     correction_media_kind: str,
+    correction_media_tags: str = "",
 ) -> tuple[dict[str, str], list[str]]:
     correction_text = correction_prompt.strip()
     meta = {
@@ -363,8 +520,10 @@ def build_phase2_transparency_preview(
         transparency_chip("reference context", "#f59e0b", "image/video/text"),
         transparency_chip("previous output", "#a78bfa", truncate_words(phase1_output)),
         transparency_chip("correction media", "#f59e0b", correction_media_kind),
-        transparency_chip("correction notes", "#34d399", truncate_words(correction_text)),
     ]
+    if correction_media_tags:
+        payload.append(transparency_chip("media tags", "#f97316", truncate_words(correction_media_tags)))
+    payload.append(transparency_chip("correction notes", "#34d399", truncate_words(correction_text)))
     return meta, payload
 
 
@@ -842,25 +1001,38 @@ def render() -> None:
     with left_col:
         st.subheader(":material/photo_camera: Phase 1 · Primary Analysis")
         original_image = st.file_uploader(
-            "Original Reference Media (image/video, optional)",
+            "Original Reference Media (image/video, optional, one or more)",
             type=SUPPORTED_MEDIA_TYPES,
             key="original_image",
+            accept_multiple_files=True,
             disabled=ui_locked,
         )
         st.caption(
-            "Optional upload: you can use text-only chat mode, or include media for multimodal analysis. "
+            "Optional upload: you can use text-only chat mode, or include one or more media items for multimodal analysis. "
             "Allowed formats: image (PNG/JPG/JPEG/WEBP) or video (MP4 only). "
             f"App-enforced video limit: {MAX_VIDEO_UPLOAD_MB} MB. "
             "Image size follows provider/endpoint limits."
         )
-        phase1_media_error = validate_media_size(original_image)
-        if phase1_media_error:
-            st.error(phase1_media_error)
-        if original_image is not None:
-            if get_media_kind(original_image) == "video":
-                st.video(original_image)
-            else:
-                st.image(original_image, caption="Original image preview", width="stretch")
+        phase1_media_errors = validate_media_sizes(original_image)
+        for media_error in phase1_media_errors:
+            st.error(media_error)
+
+        phase1_media_items = collect_tagged_media_inputs(
+            original_image,
+            phase_key_prefix="phase1",
+            ui_locked=ui_locked,
+            image_caption_prefix="Original",
+        )
+        phase1_duplicate_tags = find_duplicate_media_tags(phase1_media_items)
+        if phase1_duplicate_tags:
+            st.warning(
+                "Duplicate media tags detected: "
+                + ", ".join(phase1_duplicate_tags)
+                + ". Duplicate tags may reduce clarity in model references."
+            )
+
+        phase1_media_kind_summary = summarize_media_kind(original_image)
+        phase1_media_tag_summary = summarize_media_tag_map(phase1_media_items)
         initial_options = [p["filename"] for p in initial_presets]
         default_initial_index = (
             initial_options.index(default_initial_preset["filename"])
@@ -914,7 +1086,8 @@ def render() -> None:
             reasoning=effective_reasoning_effort,
             system_prompt=effective_system_prompt,
             initial_prompt=effective_initial_prompt,
-            reference_media_kind=get_media_kind(original_image),
+            reference_media_kind=phase1_media_kind_summary,
+            reference_media_tags=phase1_media_tag_summary,
         )
         render_transparency_block(
             phase1_meta_preview,
@@ -984,7 +1157,7 @@ def render() -> None:
         if not effective_model:
             st.error("Please provide a model name.")
             return
-        if phase1_media_error:
+        if phase1_media_errors:
             return
 
         st.session_state[LAST_ERROR] = ""
@@ -999,8 +1172,8 @@ def render() -> None:
             messages.append({"role": "system", "content": effective_system_prompt.strip()})
 
         initial_user_text = effective_initial_prompt.strip()
-
-        initial_user_message = make_user_message(original_image, initial_user_text)
+        initial_request_media = make_request_media_input(phase1_media_items)
+        initial_user_message = make_user_message(initial_request_media, initial_user_text)
         messages.append(initial_user_message)
 
         try:
@@ -1063,25 +1236,38 @@ def render() -> None:
         with corr_left:
             st.subheader(":material/sync_alt: Phase 2 · Refinement Loop")
             correction_image = st.file_uploader(
-                "Upload the generated/incorrect media (image/video, optional)",
+                "Upload the generated/incorrect media (image/video, optional, one or more)",
                 type=SUPPORTED_MEDIA_TYPES,
                 key="correction_image",
+                accept_multiple_files=True,
                 disabled=ui_locked,
             )
             st.caption(
-                "Optional upload: you can submit text-only correction notes, or include media for multimodal refinement. "
+                "Optional upload: you can submit text-only correction notes, or include one or more media items for multimodal refinement. "
                 "Allowed formats: image (PNG/JPG/JPEG/WEBP) or video (MP4 only). "
                 f"App-enforced video limit: {MAX_VIDEO_UPLOAD_MB} MB. "
                 "Image size follows provider/endpoint limits."
             )
-            phase2_media_error = validate_media_size(correction_image)
-            if phase2_media_error:
-                st.error(phase2_media_error)
-            if correction_image is not None:
-                if get_media_kind(correction_image) == "video":
-                    st.video(correction_image)
-                else:
-                    st.image(correction_image, caption="Correction image preview", width="stretch")
+            phase2_media_errors = validate_media_sizes(correction_image)
+            for media_error in phase2_media_errors:
+                st.error(media_error)
+
+            phase2_media_items = collect_tagged_media_inputs(
+                correction_image,
+                phase_key_prefix="phase2",
+                ui_locked=ui_locked,
+                image_caption_prefix="Correction",
+            )
+            phase2_duplicate_tags = find_duplicate_media_tags(phase2_media_items)
+            if phase2_duplicate_tags:
+                st.warning(
+                    "Duplicate media tags detected: "
+                    + ", ".join(phase2_duplicate_tags)
+                    + ". Duplicate tags may reduce clarity in model references."
+                )
+
+            phase2_media_kind_summary = summarize_media_kind(correction_image)
+            phase2_media_tag_summary = summarize_media_tag_map(phase2_media_items)
 
             correction_options = [p["filename"] for p in correction_presets]
             default_correction_index = (
@@ -1141,7 +1327,8 @@ def render() -> None:
                 system_prompt=effective_system_prompt,
                 phase1_output=st.session_state[PHASE1_OUTPUT],
                 correction_prompt=effective_correction_notes,
-                correction_media_kind=get_media_kind(correction_image),
+                correction_media_kind=phase2_media_kind_summary,
+                correction_media_tags=phase2_media_tag_summary,
             )
             render_transparency_block(
                 phase2_meta_preview,
@@ -1211,7 +1398,7 @@ def render() -> None:
             if not effective_model:
                 st.error("Please provide a model name.")
                 return
-            if phase2_media_error:
+            if phase2_media_errors:
                 return
 
             st.session_state[LAST_ERROR] = ""
@@ -1223,8 +1410,8 @@ def render() -> None:
             client = OpenAI(api_key=effective_api_key, base_url=effective_base_url)
 
             correction_text = effective_correction_notes.strip()
-
-            correction_user_message = make_user_message(correction_image, correction_text)
+            correction_request_media = make_request_media_input(phase2_media_items)
+            correction_user_message = make_user_message(correction_request_media, correction_text)
 
             messages = list(st.session_state[CONVERSATION_MESSAGES])
             messages.append(correction_user_message)

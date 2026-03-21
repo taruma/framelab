@@ -29,20 +29,35 @@ The app opens in your browser at `http://localhost:8501`.
 
 ### 1.2 Configure Your Environment (Recommended)
 
-Copy the example env file and add your API key:
+Copy the example env file:
 
 ```bash
 cp .env.example .env   # macOS/Linux
 copy .env.example .env  # Windows
 ```
 
-Then edit `.env`:
+Then edit `.env` with your API key. You have two options:
+
+**Option A — Universal key (simplest):**
 
 ```
 LLM_API_KEY=sk-your-key-here
 ```
 
-This lets you skip pasting the key in the sidebar each session.
+This single key works with any provider. Good enough if you only use one provider.
+
+**Option B — Provider-specific keys (recommended if you switch providers):**
+
+```
+LLM_API_KEY=sk-your-default-key
+OPENAI_API_KEY=sk-your-openai-key
+GEMINI_API_KEY=your-gemini-key
+OPENROUTER_API_KEY=sk-your-openrouter-key
+```
+
+Each provider has its own key variable (e.g., `OPENAI_API_KEY`, `GEMINI_API_KEY`, `BYTEPLUS_API_KEY`, `MIMO_API_KEY`). When you select a provider in the sidebar, the app automatically uses that provider's key if set — falling back to `LLM_API_KEY` otherwise.
+
+> **Tip:** You only need to fill in the keys for providers you actually use. Leave the rest blank.
 
 ### 1.3 Configure Your Provider
 

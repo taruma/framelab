@@ -87,6 +87,8 @@ Optional: add `name.meta.toml` sidecars (`title`, `description`, `order`) for cl
 
 ## Documentation
 
+- [`docs/INTERFACE.md`](docs/INTERFACE.md) — complete map of every UI element
+- [`docs/TUTORIAL.md`](docs/TUTORIAL.md) — step-by-step walkthrough from first launch to advanced workflows
 - [`docs/REFERENCE.md`](docs/REFERENCE.md) — technical/runtime details, advanced config, API behavior, contracts, troubleshooting
 - [`docs/TESTING.md`](docs/TESTING.md) — testing strategy and commands
 - [`CHANGELOG.md`](CHANGELOG.md) — release history and detailed changes

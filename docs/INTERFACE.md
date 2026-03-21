@@ -9,6 +9,7 @@ A complete map of every UI element in FrameLab. For step-by-step usage, see [`TU
 ### Hero Banner
 
 ![Hero banner at top of app](https://github.com/user-attachments/assets/59c41544-2b42-4dc5-9ec0-aea49303fcfe)
+
 *Hero banner displaying the app title and branding.*
 
 Displays the app title and branding. Content is loaded from `hero.md` in the project root.
@@ -16,6 +17,7 @@ Displays the app title and branding. Content is loaded from `hero.md` in the pro
 ### Notices Bar
 
 ![Notices badges below hero](https://github.com/user-attachments/assets/e8e072e7-5b65-4c10-9012-c79aeffa87cc)
+
 *Notices bar showing announcement badges.*
 
 Badges rendered from `config.toml` → `[[notices]]`. Each notice has:
@@ -33,6 +35,7 @@ Used for announcements, new model alerts, and tips.
 ### API Setup (Expander)
 
 ![Sidebar API Setup expander](https://github.com/user-attachments/assets/06eb400d-0dee-4596-b7de-e5b9ac1eff83)
+
 *API Setup section in the sidebar showing provider, key, endpoint, and model controls.*
 
 | Element | Description |
@@ -47,6 +50,7 @@ Used for announcements, new model alerts, and tips.
 ### System Prompt
 
 ![Sidebar System Prompt section](https://github.com/user-attachments/assets/dd852a0b-d593-46dd-a3a7-64c3ecc2bb14)
+
 *System Prompt section showing preset dropdown, Load button, and editable text area.*
 
 | Element | Description |
@@ -60,6 +64,7 @@ Used for announcements, new model alerts, and tips.
 ### Session Request Logging
 
 ![Sidebar Session Request Logging section](https://github.com/user-attachments/assets/b0d37561-238c-4962-a525-847812b76640)
+
 *Session Request Logging toggle and download button.*
 
 | Element | Description |
@@ -73,6 +78,7 @@ Used for announcements, new model alerts, and tips.
 ## Main Layout
 
 ![Full app layout showing two columns](https://github.com/user-attachments/assets/09b88d3e-ce14-4598-8489-d2050efa7a96)
+
 *Main two-column layout: inputs on the left, outputs on the right.*
 
 The main area is a two-column layout (`[1, 1.2]` ratio). Phase 2 appears only after Phase 1 completes.
@@ -84,6 +90,7 @@ The main area is a two-column layout (`[1, 1.2]` ratio). Phase 2 appears only af
 ### Left Column (Inputs)
 
 ![Phase 1 input column](https://github.com/user-attachments/assets/63393a32-e9c7-4dbe-bcf5-c0cc8fbfaeef)
+
 *Phase 1 left column showing media uploader, prompt presets, and Analyze button.*
 
 | Element | Description |
@@ -102,6 +109,7 @@ The main area is a two-column layout (`[1, 1.2]` ratio). Phase 2 appears only af
 ### Right Column (Outputs)
 
 ![Phase 1 output column](https://github.com/user-attachments/assets/f723e267-849e-4782-9b15-1ac6d2584af0)
+
 *Phase 1 right column showing Thought Process expander, streamed output, and copy/edit controls.*
 
 | Element | Description |
@@ -122,6 +130,7 @@ The main area is a two-column layout (`[1, 1.2]` ratio). Phase 2 appears only af
 ## Phase 2 — Refinement Loop
 
 ![Phase 2 full view](https://github.com/user-attachments/assets/58d5362d-a5b0-4460-818c-2f8db0da1222)
+
 *Phase 2 refinement panel appearing below Phase 1 after initial analysis completes.*
 
 Appears only after Phase 1 completes. Layout mirrors Phase 1.
@@ -129,6 +138,7 @@ Appears only after Phase 1 completes. Layout mirrors Phase 1.
 ### Left Column (Inputs)
 
 ![Phase 2 input column](https://github.com/user-attachments/assets/b3ea31d6-6363-41d7-8978-9b2625f80467)
+
 *Phase 2 left column showing correction media uploader, refinement notes preset, and Run Refinement button.*
 
 | Element | Description |
@@ -156,6 +166,7 @@ Appears only after Phase 1 completes. Layout mirrors Phase 1.
 ### Edit System Prompt
 
 ![Edit System Prompt dialog](https://github.com/user-attachments/assets/81965ed3-7194-4e74-a9c6-4f3c37065bfe)
+
 *Dialog for editing the system prompt in a large text area.*
 
 - **Trigger:** Sidebar → "Open large editor" button
@@ -165,6 +176,7 @@ Appears only after Phase 1 completes. Layout mirrors Phase 1.
 ### Edit Phase 1 Output
 
 ![Edit Phase 1 Output dialog](https://github.com/user-attachments/assets/5858191b-8a36-4609-aa55-4ed7b08e3840)
+
 *Dialog for manually revising Phase 1 output markdown.*
 
 - **Trigger:** Phase 1 output → ✏️ Edit button
@@ -182,6 +194,7 @@ Appears only after Phase 1 completes. Layout mirrors Phase 1.
 ### Manage Phase 1 Media Tags
 
 ![Manage Media Tags dialog](https://github.com/user-attachments/assets/4da0bea6-3ef7-4e4d-9446-ba0ab0a150ef)
+
 *Dialog showing full-size media previews with editable tag fields.*
 
 - **Trigger:** Phase 1 → "Manage media tags" button (multiple files only)
@@ -198,6 +211,7 @@ Appears only after Phase 1 completes. Layout mirrors Phase 1.
 ## Processing State
 
 ![Processing state with spinner](https://github.com/user-attachments/assets/04b95117-2f12-4b4b-83d7-0c67972b8ead)
+
 *App in processing state showing spinner and locked inputs.*
 
 When a request is in progress:

@@ -1,6 +1,6 @@
 # FrameLab Tutorial
 
-A step-by-step walkthrough from first launch to advanced workflows.
+A step-by-step walkthrough from first launch to real-world use cases.
 
 For a complete map of every UI element, see [`INTERFACE.md`](INTERFACE.md).
 
@@ -58,92 +58,112 @@ In the **sidebar → API Setup**:
 
 ---
 
-## Part 2: First Analysis
+## Part 2: Use Case — Frame Breakdown
 
-### 2.1 Text-Only Analysis (Simplest Case)
+**What you'll do:** Upload a single cinematic still and get a structured technical analysis — composition, lighting, and optics — without writing any prompt.
 
-No images required — good for a first test.
+**Best for:** Learning cinematography, building mood boards, studying reference frames.
 
-1. Leave the **Original Reference Media** uploader empty.
-2. In the **Initial Prompt** text area, type a request, for example:
+### Steps
 
-   > *"Explain the key differences between shallow depth of field and deep depth of field in cinematography, with examples."*
-
-3. Click **Analyze**.
-4. Watch the output stream live in the right column.
-5. Check the **Thought Process** expander for chain-of-thought reasoning (when available).
-
-### 2.2 Image Analysis (Core Feature)
-
-1. In **Phase 1**, click **Original Reference Media** and upload an image (PNG, JPG, JPEG, or WEBP).
+1. In **Phase 1**, click **Original Reference Media** and upload a single image (PNG, JPG, JPEG, or WEBP).
 2. The image preview appears below the uploader.
-3. Click the **Initial Prompt Preset** dropdown and select **Image Deep Dive**, then click **Load**.
-4. The prompt text box fills with a structured analysis request.
+3. In the sidebar, select **System Prompt Preset → Frame Breakdown**, then click **Load**.
+4. Leave the **Initial Prompt** text box empty — the Frame Breakdown system prompt is self-contained and drives the analysis directly.
 5. Click **Analyze**.
 6. The streamed analysis appears in the right column.
 
-### 2.3 Video Analysis
+### What You Get
 
-1. Upload an **MP4** file (max 30 MB) in the Phase 1 uploader.
-2. Switch the system prompt to **Frame Breakdown** or **Video-to-Screenplay** (see 2.4).
-3. In the Initial Prompt, describe what you want analyzed (e.g., *"Break down the camera movements and editing rhythm in this scene."*).
-4. Click **Analyze**.
+The output follows a fixed structure:
 
-> **Note:** Video analysis uses more tokens. Monitor the usage caption below the output.
+- **Narrative Description** — A concise paragraph covering visual story, mood, color palette, and spatial relationships.
+- **Composition & Geometry** — Perspective, shot size, balance, leading lines.
+- **Lighting & Photometry** — Luminance, direction, color temperature, quality.
+- **Optics & Sensor Specifications** — Focal length, depth of field, lens character, camera format.
 
-### 2.4 Switching System Prompt Presets
-
-System prompts change the *persona and output structure* of the analysis. Try different ones:
-
-| Preset | Best For |
-|--------|----------|
-| **Frame Breakdown** | Structured film-frame analysis (narrative, composition, lighting, optics) |
-| **Shotlist Script Builder** | Turning concepts into camera-ready shooting scripts |
-| **Video Prompt Planner** | Multi-shot directorial scripts with sonic/motion choreography |
-| **Film Mentor** | Creative coaching bridging traditional filmmaking and AI |
-| **Video-to-Screenplay** | Converting video footage into production-ready screenplays |
-
-**How to switch:**
-
-1. In the sidebar, open **System Prompt**.
-2. Select a preset from the **System Prompt Preset** dropdown.
-3. Click **Load**.
-4. The text area updates. You can edit it further before running analysis.
-5. Run Phase 1 again to see the different output style.
-
-> **Tip:** Click **Open large editor** for a bigger editing window.
+> **No Phase 2 needed.** This use case is a single-pass analysis. Proceed to Part 3 for a workflow that uses the refinement loop.
 
 ---
 
-## Part 3: Refinement Loop
+## Part 3: Use Case — Shotlist Script
+
+**What you'll do:** Upload 2–3 reference images (character poses, location shots, props) and generate a full shooting script with lookbook breakdown and numbered shot list. Then refine it in Phase 2.
+
+**Best for:** Pre-production planning, turning a visual concept into a camera-ready screenplay.
+
+### Phase 1: Generate the Shotlist
+
+1. In **Phase 1**, upload 2–3 reference images — for example, a character portrait, a location wide shot, and a key prop close-up.
+2. The thumbnail strip shows compact previews. Click **Manage media tags** to rename tags from defaults (`@image1`, `@image2`) to descriptive names like `@detective`, `@alley`, `@knife`.
+3. In the sidebar, select **System Prompt Preset → Shotlist Script Builder**, then click **Load**.
+4. In the **Initial Prompt** text area, describe your scene concept. For example:
+
+   > *"A tense confrontation in a rain-soaked alley at night. The detective (image 1) corners the suspect (image 2) near a dumpster (image 3). The scene starts calm and escalates to a chase."*
+
+5. Click **Analyze**.
+
+### What You Get
+
+The output has two parts:
+
+- **Part 1: Scene Header (Lookbook)** — Aesthetic mood, theme, location, time, lighting, sound atmosphere, key props, character descriptions (referencing your media tags), staging, and shot map.
+- **Part 2: Screenplay (Shot List)** — A numbered shot-by-shot script using standard screenplay format with shot sizes (WS, MS, CU, ECU), angles (HIGH, LOW, DUTCH), and movement (STATIC, DOLLY, HANDHELD, PUSH-IN).
+
+### Phase 2: Refine the Script
 
 After Phase 1 completes, the **Phase 2** panel appears below.
 
-### 3.1 Text-Only Refinement
+1. In the **Refinement Notes** text area, type specific revision instructions. For example:
 
-1. In the **Refinement Notes** text area, type instructions like:
-
-   > *"Focus more on the color grading and mood. Expand the lighting analysis."*
+   > *"Add more extreme close-ups on the suspect's hands during the confrontation. Slow the pacing in the first beat — hold the wide shot longer before cutting in. Add SFX for distant thunder."*
 
 2. Click **Run Refinement**.
+3. The refined script appears in the Phase 2 output column, building on the original analysis.
 
-### 3.2 Media-Assisted Refinement
-
-1. Upload a generated or comparison image/video in the **Correction Media** uploader.
-2. Add refinement notes describing what should change.
-3. Click **Run Refinement**.
-
-> **How it works:** Phase 2 sends the full conversation context — system prompt, original media, your Phase 1 output, correction media, and refinement notes — so the model can revise its analysis.
-
-### 3.3 Iterating Further
-
-You can run Phase 2 multiple times. Each refinement builds on the previous output. Use the **Refinement Notes Preset** dropdown to load structured correction templates, or type freeform instructions.
+> **Tip:** You can run Phase 2 multiple times. Each refinement builds on the previous output. Use the **Refinement Notes Preset** dropdown to load structured correction templates, or type freeform instructions.
 
 ---
 
-## Part 4: Advanced Features
+## Part 4: Use Case — Video-to-Screenplay
 
-### 4.1 Output Actions
+**What you'll do:** Upload a video clip and convert it into a chronological, production-ready screenplay. Optionally add reference images for context.
+
+**Best for:** Transcribing existing footage, creating shot documentation from dailies, building screenplays from reference material.
+
+### Phase 1: Generate the Screenplay
+
+1. In **Phase 1**, upload an **MP4** file (max 30 MB).
+2. Optionally upload 1–2 reference images alongside the video — for example, a location reference or a character sheet. Use **Manage media tags** to give them clear names.
+3. In the sidebar, select **System Prompt Preset → Video-to-Screenplay**, then click **Load**.
+4. In the **Initial Prompt** text area, describe what you want extracted. For example:
+
+   > *"Convert this video into a detailed hybrid screenplay. Focus on accurate dialogue transcription, shot-by-shot camera breakdown, and sound design notes. Mark any unclear audio as [inaudible]."*
+
+5. Click **Analyze**.
+
+### What You Get
+
+The output follows this structure:
+
+- **Summary paragraph** — A single continuous overview of the full video's visual and audible progression.
+- **Screenplay** — Chronological shot-by-shot script with timecodes, framing, camera movement, action description, dialogue (exact transcription where audible), audio cues, on-screen text, and transitions.
+
+> **Note:** Video analysis uses more tokens than image analysis. Monitor the usage caption below the output.
+
+### Optional Phase 2
+
+If you want to refine the screenplay:
+
+1. Upload a comparison or corrected version of the video/images in the **Phase 2** uploader.
+2. Add refinement notes — for example, *"Clarify the dialogue attribution in the second scene. The speaker is the woman, not the man. Add more ambient sound descriptions."*
+3. Click **Run Refinement**.
+
+---
+
+## Part 5: Advanced Features
+
+### 5.1 Output Actions
 
 Below each output (Phase 1 and Phase 2):
 
@@ -152,7 +172,7 @@ Below each output (Phase 1 and Phase 2):
 - **✏️ Edit** — Opens a dialog to manually revise the output. After editing, the usage caption shows "Edited by user".
 - **Usage caption** — Shows input/output/total token counts when available from the provider.
 
-### 4.2 POS Highlighting (Optional)
+### 5.2 POS Highlighting (Optional)
 
 FrameLab can highlight parts of speech in English outputs using spaCy.
 
@@ -165,7 +185,7 @@ FrameLab can highlight parts of speech in English outputs using spaCy.
 
 > **Note:** This requires the spaCy `en_core_web_sm` model (installed via `uv sync`). It only works on English text.
 
-### 4.3 Multiple Media & Tagging
+### 5.3 Multiple Media & Tagging
 
 When uploading multiple files in a single phase:
 
@@ -176,7 +196,7 @@ When uploading multiple files in a single phase:
 
 > **Tip:** Duplicate tags trigger a warning. Use unique names for clarity.
 
-### 4.4 Request Transparency
+### 5.4 Request Transparency
 
 Each phase has a collapsed **🔎 Request Transparency** expander. Expand it to see:
 
@@ -185,7 +205,7 @@ Each phase has a collapsed **🔎 Request Transparency** expander. Expand it to 
 
 This helps you verify exactly what the model receives before clicking Analyze or Run Refinement.
 
-### 4.5 Session Request Logging
+### 5.5 Session Request Logging
 
 For debugging or auditing:
 
@@ -207,6 +227,16 @@ The JSON includes transport type, provider, endpoint, media filenames, request p
 | `prompts/correction/` | Refinement note presets (Phase 2 request templates) |
 
 Each `.txt` file can have an optional `.meta.toml` sidecar with `title`, `description`, and `order` fields for UI labels.
+
+### System Prompt Presets
+
+| Preset | Best For |
+|--------|----------|
+| **Frame Breakdown** | Structured film-frame analysis (narrative, composition, lighting, optics) |
+| **Shotlist Script Builder** | Turning concepts into camera-ready shooting scripts |
+| **Video Prompt Planner** | Multi-shot directorial scripts with sonic/motion choreography |
+| **Film Mentor** | Creative coaching bridging traditional filmmaking and AI |
+| **Video-to-Screenplay** | Converting video footage into production-ready screenplays |
 
 ---
 

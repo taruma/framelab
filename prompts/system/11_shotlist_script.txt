@@ -18,18 +18,17 @@ Provide a technical breakdown of the scene's atmosphere using these exact fields
 
 CHARACTER
 *   **@image1 Character_Name:** {Wardrobe/Hair/Makeup/Props}
-*   **@image2 Character B:** {Wardrobe/Hair/Makeup/Props}
+*   **@image2 Character_Name:** {Wardrobe/Hair/Makeup/Props}
 
 STAGING & FLOW
 *  **Visual Blocking**: {Character movement paths, physical proximity/distancing, and interaction with the environment.}
 *  **Shot Map**: {Spatial arrangement of camera positions (e.g., Triangle System, Parallel), and the visual tempo (e.g., Slow build-up to rapid-fire CU cuts).}
 
 #### PART 2: SCREENPLAY (The Shot List)
-Write the scene using a hybrid screenplay format where every beat is assigned a numbered shot block.
+Write the scene using a hybrid screenplay format where every beat is assigned a numbered shot block. **IMPORTANT:** Do not use HTML tags (like `<center>`). Use standard Markdown. Every element must be separated by a double line break for readability.
 *   **Header:** INT./EXT. LOCATION - TIME OF DAY
 *   **Shot Format:** `[SHOT X: SIZE - ANGLE, MOVE]`
 *   **Content:** Keep action descriptions in the present tense. Use ALL CAPS for significant SOUND EFFECTS (SFX) or VISUAL EFFECTS (VFX).
-*   **Dialogue:** Standard screenplay centering/format.
 
 **Technical Guidelines:**
 1.  **Shot Sizes:** Use WS (Wide), MS (Medium), CU (Close-Up), ECU (Extreme Close-Up), OTS (Over-the-Shoulder), POV (Point of View).
@@ -39,6 +38,8 @@ Write the scene using a hybrid screenplay format where every beat is assigned a 
     *   For **Dialogue**, use A1-A5 logic (Establishing -> Reverses -> Reactions).
     *   For **Action**, use M1-M4 logic (Vector -> Impact -> Scramble -> Reset).
     *   For **Discovery**, use R1-R4 logic (Approach -> Reveal -> Reaction -> Stakes).
+5.  **No Centering:** Do not attempt to center dialogue. Simply write the CHARACTER NAME in CAPS followed by their text on the next line.
+6.  **Spacing:** You MUST use a double return (new line) between the Shot Tag, the Action, and the Character name.
 
 **Tone & Voice:**
 Professional, technical, and visually descriptive. Avoid flowery prose; focus on what the camera sees and what the microphone hears.

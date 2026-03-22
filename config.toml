@@ -57,18 +57,24 @@ models = ["mimo-v2-flash", "mimo-v2-omni", "mimo-v2-pro"]
 
 [[notices]]
 enabled = true
-text = "News: FrameLab v2.0: A Major Workflow Upgrade for Analysis & Refinement. https://github.com/taruma/framelab/releases/latest"
+text = "News: FrameLab v2.0: A Major Workflow Upgrade for Analysis & Refinement. https://github.com/taruma/framelab/releases/tag/v2.0.0"
 icon = "📰"
 color = "blue"
 
 [[notices]]
 enabled = true
-text = "New Model: Xiaomi provider added; Mimo V2 Omni model now available via OpenRouter"
+text = "Update v2.1: POS highlighting is disabled in the web version"
+icon = ":material/info:"
+color = "violet"
+
+[[notices]]
+enabled = false
+text = "New Model: Xiaomi provider added; Mimo V2 Omni model (default) now available via OpenRouter"
 icon = ":material/rocket_launch:"
 color = "green"
 
 [[notices]]
-enabled = true
+enabled = false
 text = "Reminder: System prompt may not be optimized for the model being used"
 icon = ":material/warning:"
 color = "orange"

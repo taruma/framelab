@@ -71,6 +71,16 @@ Then add your key to `.env` (for example `LLM_API_KEY=...`) or paste it in the s
 3. **Phase 2 — Refinement Loop**
    - Add refinement notes and optional follow-up media to iterate on the result.
 
+### Feature flags
+
+- **Since v2.1.0:** POS highlighting controls are feature-gated and hidden by default.
+- To enable locally, set this in `config.toml`:
+
+```toml
+[features]
+pos_highlighting = true
+```
+
 ---
 
 ## Prompt presets
@@ -103,6 +113,7 @@ Distributed under the MIT License. See `LICENSE` for details.
 ---
 
 Built with ❤️ by **Taruma Sakti** · Vibecoding with Cline + GPT-5.3-Codex
+
 
 
 

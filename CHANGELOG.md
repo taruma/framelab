@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-03-22
+
+### Changed
+
+- POS highlighting controls are now feature-gated via `config.toml` (`[features].pos_highlighting`) and default to hidden/off for minimal UI by default.
+
 ## [2.0.0] - 2026-03-20
 
 ### Added

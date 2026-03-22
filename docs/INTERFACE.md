@@ -114,11 +114,11 @@ The main area is a two-column layout (`[1, 1.2]` ratio). Phase 2 appears only af
 
 | Element | Description |
 |---------|-------------|
-| **Highlight POS (EN only)** | Checkbox to enable part-of-speech highlighting. Default: off. |
-| **POS types to highlight** | Multiselect (Verb, Adjective, Noun). Only active when POS highlighting is checked. |
+| **Highlight POS (EN only)** | Checkbox to enable part-of-speech highlighting. Since v2.1.0, this control is visible only when `config.toml` has `[features].pos_highlighting = true`. |
+| **POS types to highlight** | Multiselect (Verb, Adjective, Noun). Only active when POS highlighting is checked, and visible only when POS highlighting is enabled via config (v2.1.0+). |
 | **Thought Process** | Expander showing chain-of-thought reasoning streamed from the model (when available). |
 | **Output area** | Main streamed response rendered as markdown. |
-| **POS note** | Caption showing which POS tags are highlighted (appears only when highlighting is active). |
+| **POS note** | Caption showing which POS tags are highlighted (appears only when highlighting is active and the feature flag is enabled; v2.1.0+). |
 | **Usage caption** | Token counts: input, output, total. Shows "not returned by this model/provider" if unavailable. Appends "Edited by user" if manually edited. |
 | **✏️ Edit** | Button to open a dialog for manually revising the output. Dialog has **Submit changes** and **Cancel**. |
 | **Copy Plain Text** | Button to copy output with markdown formatting stripped. |
@@ -157,7 +157,7 @@ Appears only after Phase 1 completes. Layout mirrors Phase 1.
 
 | Element | Description |
 |---------|-------------|
-| Same as Phase 1 output column | POS highlighting, Thought Process, output area, usage, Edit, Copy buttons. All scoped to Phase 2. |
+| Same as Phase 1 output column | POS highlighting (feature-gated since v2.1.0), Thought Process, output area, usage, Edit, Copy buttons. All scoped to Phase 2. |
 
 ---
 

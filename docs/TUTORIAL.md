@@ -191,12 +191,19 @@ Below each output (Phase 1 and Phase 2):
 
 FrameLab can highlight parts of speech in English outputs using spaCy.
 
-1. Check **Highlight POS (EN only): verbs / adjectives / nouns** below the output.
-2. Use the **POS types to highlight** multiselect to choose which tags appear:
+1. **Since v2.1.0:** enable the feature flag in `config.toml` (POS controls are hidden by default):
+
+   ```toml
+   [features]
+   pos_highlighting = true
+   ```
+
+2. Check **Highlight POS (EN only): verbs / adjectives / nouns** below the output.
+3. Use the **POS types to highlight** multiselect to choose which tags appear:
    - **Verb** → red background
    - **Adjective** → blue background
    - **Noun** → green background
-3. The highlighted text renders in the output area. Plain text copy remains unmodified.
+4. The highlighted text renders in the output area. Plain text copy remains unmodified.
 
 > **Note:** This requires the spaCy `en_core_web_sm` model (installed via `uv sync`). It only works on English text.
 

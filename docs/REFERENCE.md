@@ -112,7 +112,14 @@ uv run run.py
 
 ### Optional POS highlighting (EN)
 
-- Default: OFF
+- Changed in v2.1.0: POS highlighting controls are feature-gated and hidden by default unless enabled in `config.toml`.
+- Config flag:
+
+```toml
+[features]
+pos_highlighting = false
+```
+
 - Tag selection: Verb / Adjective / Noun
 - spaCy model lazy-loads only when highlighting is enabled
 - Highlight rendering does not overwrite stored raw output

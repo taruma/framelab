@@ -79,6 +79,8 @@ In the **sidebar → API Setup**:
 
 **Best for:** Learning cinematography, building mood boards, studying reference frames.
 
+https://github.com/user-attachments/assets/b03d8cea-ebce-4452-b27b-235f63dd173b
+
 ### Steps
 
 1. In **Phase 1**, click **Original Reference Media** and upload a single image (PNG, JPG, JPEG, or WEBP).
@@ -106,6 +108,8 @@ The output follows a fixed structure:
 **What you'll do:** Upload 2–3 reference images (character poses, location shots, props) and generate a full shooting script with lookbook breakdown and numbered shot list. Then refine it in Phase 2.
 
 **Best for:** Pre-production planning, turning a visual concept into a camera-ready screenplay.
+
+https://github.com/user-attachments/assets/15a06774-e178-4eae-8594-6dc19c8dc126
 
 ### Phase 1: Generate the Shotlist
 
@@ -145,6 +149,8 @@ After Phase 1 completes, the **Phase 2** panel appears below.
 **What you'll do:** Upload a video clip and convert it into a chronological, production-ready screenplay. Optionally add reference images for context.
 
 **Best for:** Transcribing existing footage, creating shot documentation from dailies, building screenplays from reference material.
+
+https://github.com/user-attachments/assets/92b126c1-3b80-444d-a5fc-8a9e9e0667c7
 
 ### Phase 1: Generate the Screenplay
 

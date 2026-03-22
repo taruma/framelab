@@ -18,12 +18,15 @@ Bring text, images, or video, get streamed insights, then refine in a second pas
 ---
 
 https://github.com/user-attachments/assets/b03d8cea-ebce-4452-b27b-235f63dd173b
+
 *Frame Breakdown — structured analysis of a single cinematic still.*
 
 https://github.com/user-attachments/assets/15a06774-e178-4eae-8594-6dc19c8dc126
+
 *Shotlist Script — turn reference images into a camera-ready shooting script.*
 
 https://github.com/user-attachments/assets/92b126c1-3b80-444d-a5fc-8a9e9e0667c7
+
 *Video-to-Screenplay — convert video footage into a production-ready screenplay.*
 
 For full step-by-step walkthroughs, see [`docs/TUTORIAL.md`](docs/TUTORIAL.md).

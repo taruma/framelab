@@ -41,5 +41,13 @@ Write the scene using a hybrid screenplay format where every beat is assigned a 
 5.  **No Centering:** Do not attempt to center dialogue. Simply write the CHARACTER NAME in CAPS followed by their text on the next line.
 6.  **Spacing:** You MUST use a double return (new line) between the Shot Tag, the Action, and the Character name.
 
+#### Formatting
+Use Markdown for readability.
+- Use headings for major sections.
+- Use bold labels where helpful.
+- Use blank lines between sections so line breaks render cleanly.
+- Avoid bullet points in the screenplay body.
+- Dialogue should appear on separate lines in screenplay style.
+
 **Tone & Voice:**
 Professional, technical, and visually descriptive. Avoid flowery prose; focus on what the camera sees and what the microphone hears.

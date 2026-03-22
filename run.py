@@ -1063,6 +1063,8 @@ def render() -> None:
     providers = app_config.get("providers", {})
     defaults = app_config.get("defaults", {})
     prompts_cfg = app_config.get("prompts", {})
+    features_cfg = app_config.get("features", {})
+    pos_highlighting_enabled = bool(features_cfg.get("pos_highlighting", False))
 
     system_dir = str(prompts_cfg.get("system_dir", "prompts/system")).strip() or "prompts/system"
     initial_dir = str(prompts_cfg.get("initial_dir", "prompts/initial")).strip() or "prompts/initial"
@@ -1365,24 +1367,28 @@ def render() -> None:
 
     with right_col:
         st.subheader(":material/description: Phase 1 Output")
-        phase1_highlight_enabled = st.checkbox(
-            "Highlight POS (EN only): verbs / adjectives / nouns",
-            key="phase1_pos_highlight",
-            value=False,
-        )
-        phase1_pos_options = {
-            "Verb": "VERB",
-            "Adjective": "ADJ",
-            "Noun": "NOUN",
-        }
-        phase1_selected_labels = st.multiselect(
-            "POS types to highlight",
-            options=list(phase1_pos_options.keys()),
-            default=list(phase1_pos_options.keys()),
-            key="phase1_pos_types",
-            disabled=not phase1_highlight_enabled,
-        )
-        phase1_selected_tags = {phase1_pos_options[label] for label in phase1_selected_labels}
+        if pos_highlighting_enabled:
+            phase1_highlight_enabled = st.checkbox(
+                "Highlight POS (EN only): verbs / adjectives / nouns",
+                key="phase1_pos_highlight",
+                value=False,
+            )
+            phase1_pos_options = {
+                "Verb": "VERB",
+                "Adjective": "ADJ",
+                "Noun": "NOUN",
+            }
+            phase1_selected_labels = st.multiselect(
+                "POS types to highlight",
+                options=list(phase1_pos_options.keys()),
+                default=list(phase1_pos_options.keys()),
+                key="phase1_pos_types",
+                disabled=not phase1_highlight_enabled,
+            )
+            phase1_selected_tags = {phase1_pos_options[label] for label in phase1_selected_labels}
+        else:
+            phase1_highlight_enabled = False
+            phase1_selected_tags: set[str] = set()
         phase1_thought_expander = st.expander(":material/psychology: Thought Process", expanded=True)
         phase1_thought_placeholder = phase1_thought_expander.empty()
         phase1_answer_placeholder = st.empty()
@@ -1638,24 +1644,28 @@ def render() -> None:
 
         with corr_right:
             st.subheader(":material/auto_awesome: Refined Analysis")
-            phase2_highlight_enabled = st.checkbox(
-                "Highlight POS (EN only): verbs / adjectives / nouns",
-                key="phase2_pos_highlight",
-                value=False,
-            )
-            phase2_pos_options = {
-                "Verb": "VERB",
-                "Adjective": "ADJ",
-                "Noun": "NOUN",
-            }
-            phase2_selected_labels = st.multiselect(
-                "POS types to highlight",
-                options=list(phase2_pos_options.keys()),
-                default=list(phase2_pos_options.keys()),
-                key="phase2_pos_types",
-                disabled=not phase2_highlight_enabled,
-            )
-            phase2_selected_tags = {phase2_pos_options[label] for label in phase2_selected_labels}
+            if pos_highlighting_enabled:
+                phase2_highlight_enabled = st.checkbox(
+                    "Highlight POS (EN only): verbs / adjectives / nouns",
+                    key="phase2_pos_highlight",
+                    value=False,
+                )
+                phase2_pos_options = {
+                    "Verb": "VERB",
+                    "Adjective": "ADJ",
+                    "Noun": "NOUN",
+                }
+                phase2_selected_labels = st.multiselect(
+                    "POS types to highlight",
+                    options=list(phase2_pos_options.keys()),
+                    default=list(phase2_pos_options.keys()),
+                    key="phase2_pos_types",
+                    disabled=not phase2_highlight_enabled,
+                )
+                phase2_selected_tags = {phase2_pos_options[label] for label in phase2_selected_labels}
+            else:
+                phase2_highlight_enabled = False
+                phase2_selected_tags: set[str] = set()
             phase2_thought_expander = st.expander(":material/psychology: Thought Process", expanded=True)
             phase2_thought_placeholder = phase2_thought_expander.empty()
             phase2_answer_placeholder = st.empty()

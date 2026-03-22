@@ -1,3 +1,6 @@
+[features]
+pos_highlighting = false
+
 [defaults]
 provider = "openrouter"
 reasoning_effort = "low"

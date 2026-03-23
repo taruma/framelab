@@ -146,7 +146,7 @@ After Phase 1 completes, the **Phase 2** panel appears below.
 
 ## Part 4: Use Case — Video-to-Screenplay
 
-**What you'll do:** Upload a video clip and convert it into a chronological, production-ready screenplay. Optionally add reference images for context.
+**What you'll do:** Upload a video clip and convert it into a chronological, production-ready screenplay. Add character reference images so the model can identify speakers by name.
 
 **Best for:** Transcribing existing footage, creating shot documentation from dailies, building screenplays from reference material.
 
@@ -155,12 +155,9 @@ https://github.com/user-attachments/assets/92b126c1-3b80-444d-a5fc-8a9e9e0667c7
 ### Phase 1: Generate the Screenplay
 
 1. In **Phase 1**, upload an **MP4** file (max 30 MB).
-2. Optionally upload 1–2 reference images alongside the video — for example, a location reference or a character sheet. Use **Manage media tags** to give them clear names.
+2. Upload 2 character reference images — one per character appearing in the video. Use **Manage media tags** to rename them to character names in ALL CAPS (e.g., `DAVE`, `FRANK`).
 3. In the sidebar, select **System Prompt Preset → Video-to-Screenplay**, then click **Load**.
-4. In the **Initial Prompt** text area, describe what you want extracted. For example:
-
-   > *"Convert this video into a detailed hybrid screenplay. Focus on accurate dialogue transcription, shot-by-shot camera breakdown, and sound design notes. Mark any unclear audio as [inaudible]."*
-
+4. Leave the **Initial Prompt** text box empty — the Video-to-Screenplay system prompt is self-contained and drives the analysis directly.
 5. Click **Analyze**.
 
 ### What You Get

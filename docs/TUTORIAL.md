@@ -169,14 +169,6 @@ The output follows this structure:
 
 > **Note:** Video analysis uses more tokens than image analysis. Monitor the usage caption below the output.
 
-### Optional Phase 2
-
-If you want to refine the screenplay:
-
-1. Upload a comparison or corrected version of the video/images in the **Phase 2** uploader.
-2. Add refinement notes — for example, *"Clarify the dialogue attribution in the second scene. The speaker is the woman, not the man. Add more ambient sound descriptions."*
-3. Click **Run Refinement**.
-
 ---
 
 ## Part 5: Advanced Features

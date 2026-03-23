@@ -58,7 +58,7 @@ models = ["mimo-v2-flash", "mimo-v2-omni", "mimo-v2-pro"]
 [[notices]]
 enabled = true
 text = "News: FrameLab v2.0: A Major Workflow Upgrade for Analysis & Refinement. https://github.com/taruma/framelab/releases/tag/v2.0.0"
-icon = "📰"
+icon = ":material/newspaper:"
 color = "blue"
 
 [[notices]]
@@ -83,4 +83,10 @@ color = "orange"
 enabled = false
 text = "Tip: Use prompt presets first, then fine-tune in the text box"
 icon = "💡"
+color = "green"
+
+[[notices]]
+enabled = true
+text = "New to FrameLab? Learn 3 use cases in the tutorial — https://github.com/taruma/framelab/blob/main/docs/TUTORIAL.md"
+icon = ":material/menu_book:"
 color = "green"

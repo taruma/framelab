@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tomllib
 from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
@@ -44,7 +45,11 @@ def test_phase2_sections_visible_after_phase1_done_state() -> None:
     assert ":material/auto_awesome: Refined Analysis" in subheaders
 
 
-def test_analyze_without_media_does_not_require_upload() -> None:
+def test_analyze_without_media_does_not_require_upload(monkeypatch) -> None:
+    # Clear API key env vars so the app doesn't attempt a real API call
+    for key in ("LLM_API_KEY", "API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY"):
+        monkeypatch.delenv(key, raising=False)
+
     app = AppTest.from_file("run.py")
     app.run(timeout=20)
 
@@ -55,15 +60,34 @@ def test_analyze_without_media_does_not_require_upload() -> None:
     assert all("Please upload an original reference media file." not in err for err in errors)
 
 
+def _resolve_expected_default_system_prompt_first_line() -> str:
+    """Read config.toml and return the first line of the configured default system prompt."""
+    config_path = Path("config.toml")
+    if not config_path.exists():
+        # Fallback to system_prompt.txt when config is missing
+        return Path("system_prompt.txt").read_text(encoding="utf-8").strip().splitlines()[0]
+
+    with config_path.open("rb") as f:
+        cfg = tomllib.load(f)
+
+    default_system_file = str(cfg.get("prompts", {}).get("default_system", "")).strip()
+    if default_system_file:
+        prompt_path = Path("prompts/system") / default_system_file
+        if prompt_path.exists():
+            return prompt_path.read_text(encoding="utf-8").strip().splitlines()[0]
+
+    return Path("system_prompt.txt").read_text(encoding="utf-8").strip().splitlines()[0]
+
+
 def test_system_prompt_textbox_prefilled_from_default_system_preset() -> None:
     app = AppTest.from_file("run.py")
     app.run(timeout=20)
 
     system_prompt_text = _find_textarea_by_key(app, "system_prompt_text")
     assert system_prompt_text is not None
-    assert system_prompt_text.value.strip().startswith(
-        "You are a cinematography and film-analysis assistant"
-    )
+
+    expected_first_line = _resolve_expected_default_system_prompt_first_line()
+    assert system_prompt_text.value.strip().startswith(expected_first_line)
 
 
 def test_system_prompt_load_button_applies_selected_preset() -> None:

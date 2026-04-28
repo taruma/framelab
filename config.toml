@@ -3,57 +3,57 @@ pos_highlighting = false
 
 [defaults]
 provider = "openrouter"
-reasoning_effort = "low"
+reasoning_effort = "high"
 
 [prompts]
 system_dir = "prompts/system"
 initial_dir = "prompts/initial"
 correction_dir = "prompts/correction"
-default_system = "10_frame_breakdown.txt"
-default_initial = "10_image_deepdive.txt"
+default_system = "20_screenplay_realization_checker.txt"
+default_initial = "30_script_cue_extraction.txt"
 default_correction = "10_refine_with_image.txt"
 
-[providers.byteplus]
-label = "BytePlus"
-base_url = "https://ark.ap-southeast.bytepluses.com/api/v3"
-default_model = "seed-2-0-lite-260228"
-env_key = "BYTEPLUS_API_KEY"
-models = ["seed-2-0-mini-260215", "seed-2-0-lite-260228"]
+# [providers.byteplus]
+# label = "BytePlus"
+# base_url = "https://ark.ap-southeast.bytepluses.com/api/v3"
+# default_model = "seed-2-0-lite-260228"
+# env_key = "BYTEPLUS_API_KEY"
+# models = ["seed-2-0-mini-260215", "seed-2-0-lite-260228"]
 
-[providers.openai]
-label = "OpenAI"
-base_url = "https://api.openai.com/v1"
-default_model = "gpt-5-mini"
-env_key = "OPENAI_API_KEY"
-models = ["gpt-5-mini", "gpt-5", "gpt-5.4"]
+# [providers.openai]
+# label = "OpenAI"
+# base_url = "https://api.openai.com/v1"
+# default_model = "gpt-5-mini"
+# env_key = "OPENAI_API_KEY"
+# models = ["gpt-5-mini", "gpt-5", "gpt-5.4"]
 
-[providers.gemini]
-label = "Gemini (OpenAI-compatible)"
-base_url = "https://generativelanguage.googleapis.com/v1beta/openai/"
-default_model = "gemini-3-flash-preview"
-env_key = "GEMINI_API_KEY"
-models = ["gemini-3.1-flash-lite-preview", "gemini-3-flash-preview", "gemini-3.1-pro-preview"]
+# [providers.gemini]
+# label = "Gemini (OpenAI-compatible)"
+# base_url = "https://generativelanguage.googleapis.com/v1beta/openai/"
+# default_model = "gemini-3-flash-preview"
+# env_key = "GEMINI_API_KEY"
+# models = ["gemini-3.1-flash-lite-preview", "gemini-3-flash-preview", "gemini-3.1-pro-preview"]
 
 [providers.openrouter]
 label = "OpenRouter"
 base_url = "https://openrouter.ai/api/v1"
-default_model = "xiaomi/mimo-v2-omni"
+default_model = "xiaomi/mimo-v2.5"
 env_key = "OPENROUTER_API_KEY"
-models = ["xiaomi/mimo-v2-omni", "bytedance-seed/seed-2.0-lite", "bytedance-seed/seed-2.0-mini"]
+models = ["xiaomi/mimo-v2.5", "xiaomi/mimo-v2-omni", "google/gemini-3-flash-preview"]
 
-[providers.claude]
-label = "Claude (OpenAI-compatible)"
-base_url = "https://api.anthropic.com/v1"
-default_model = "claude-haiku-4-5-20251001"
-env_key = "ANTHROPIC_API_KEY"
-models = ["claude-haiku-4-5-20251001", "claude-sonnet-4-6"]
+# [providers.claude]
+# label = "Claude (OpenAI-compatible)"
+# base_url = "https://api.anthropic.com/v1"
+# default_model = "claude-haiku-4-5-20251001"
+# env_key = "ANTHROPIC_API_KEY"
+# models = ["claude-haiku-4-5-20251001", "claude-sonnet-4-6"]
 
-[providers.xiaomi]
-label = "Xiaomi"
-base_url = "https://api.xiaomimimo.com/v1"
-default_model = "mimo-v2-omni"
-env_key = "MIMO_API_KEY"
-models = ["mimo-v2-flash", "mimo-v2-omni", "mimo-v2-pro"]
+# [providers.xiaomi]
+# label = "Xiaomi"
+# base_url = "https://api.xiaomimimo.com/v1"
+# default_model = "mimo-v2-omni"
+# env_key = "MIMO_API_KEY"
+# models = ["mimo-v2-flash", "mimo-v2-omni", "mimo-v2-pro"]
 
 [[notices]]
 enabled = true
@@ -62,14 +62,14 @@ icon = ":material/newspaper:"
 color = "blue"
 
 [[notices]]
-enabled = true
+enabled = false
 text = "Update v2.1: POS highlighting is disabled in the web version"
 icon = ":material/info:"
 color = "violet"
 
 [[notices]]
-enabled = false
-text = "New Model: Xiaomi provider added; Mimo V2 Omni model (default) now available via OpenRouter"
+enabled = true
+text = "New Model: Mimo V2.5 model (default) now available via OpenRouter"
 icon = ":material/rocket_launch:"
 color = "green"
 

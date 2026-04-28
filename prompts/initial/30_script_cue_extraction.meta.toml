@@ -1,0 +1,3 @@
+title = "Script Cue Extraction"
+description = "Full analysis prompt with detailed methodology for extracting exact realized script spans as structured cue objects."
+order = 30

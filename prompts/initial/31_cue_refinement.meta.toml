@@ -1,0 +1,3 @@
+title = "Cue Refinement"
+description = "Lightweight template for passing additional refinement instructions alongside script text for follow-up cue extraction."
+order = 31

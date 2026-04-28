@@ -1,0 +1,38 @@
+Analyze the attached video against `scriptText` as a verification task.
+
+Goal:
+Extract only the exact spans of `scriptText` that are clearly realized in the video/audio.
+
+Method:
+1. Watch the full clip once to understand the sequence and pacing.
+2. Watch again frame by frame, and listen carefully, to cross-check every realized event.
+3. For each realized event, select the smallest exact contiguous substring from `scriptText` that is directly supported by the video/audio.
+4. Use separate cues for separate events and types (dialogue, action, camera, shot, audio, vfx, transition, environment).
+5. For dialogue, include only the spoken words; do not include character names.
+6. If a parenthetical is actually realized, treat it as its own cue only if it is directly supported.
+7. If only part of a sentence is realized, annotate only that part.
+8. Do not block an entire line when only a word or phrase is supported.
+9. Do not paraphrase, summarize, infer, normalize, or merge disjoint text.
+10. Do not force coverage of every line in the script; omit anything not clearly evidenced.
+11. If evidence is weak or ambiguous, prefer a smaller supported span or omit it rather than guessing.
+
+Priority:
+Precision over completeness.
+
+Treat `[CAM]` as a section marker for camera-related text.
+Any text immediately following `[CAM]` should be checked as camera/shot material.
+Use `camera` for movement/lens terms like PAN, TILT, DOLLY, ZOOM, PUSH IN, PULL BACK.
+Use `shot` for framing/composition terms like CU, MCU, WS, MS, OTS.
+Do not ignore short technical tokens after `[CAM]`; if they are supported by the video, emit them as exact cue text.
+
+---
+
+Total cue should be above 100+.
+
+---
+
+THE SCRIPT:
+
+<scriptText>
+...
+</scriptText>

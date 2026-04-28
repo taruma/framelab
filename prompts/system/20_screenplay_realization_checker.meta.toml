@@ -1,0 +1,3 @@
+title = "Screenplay Realization Checker"
+description = "Verifies which exact script spans are realized in a video, classifies each by cue type, and returns structured JSON cue objects."
+order = 20

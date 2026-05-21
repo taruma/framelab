@@ -13,12 +13,12 @@ default_system = "20_screenplay_realization_checker.txt"
 default_initial = "30_script_cue_extraction.txt"
 default_correction = "10_refine_with_image.txt"
 
-# [providers.byteplus]
-# label = "BytePlus"
-# base_url = "https://ark.ap-southeast.bytepluses.com/api/v3"
-# default_model = "seed-2-0-lite-260228"
-# env_key = "BYTEPLUS_API_KEY"
-# models = ["seed-2-0-mini-260215", "seed-2-0-lite-260228"]
+[providers.byteplus]
+label = "BytePlus"
+base_url = "https://ark.ap-southeast.bytepluses.com/api/v3"
+default_model = "seed-2-0-lite-260428"
+env_key = "BYTEPLUS_API_KEY"
+models = ["seed-2-0-mini-260428", "seed-2-0-lite-260428"]
 
 # [providers.openai]
 # label = "OpenAI"

@@ -61,6 +61,7 @@ TIMING RULES
 - Time cues tightly around when the event is actually visible/audible.
 - Dialogue timing should cover only the spoken words.
 - Camera/audio/transition timing should match the actual duration of the event.
+- `startTime` and `endTime` must be numeric total seconds (e.g., 1 minute 5 seconds must be 65.0, NOT 1.05 or NOT 105. Always convert minutes to cumulative seconds: minutes * 60 + seconds).
 
 TEXT MATCH RULES
 - `selectedText` must match `scriptText` exactly, character-for-character.

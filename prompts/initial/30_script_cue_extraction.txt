@@ -15,9 +15,10 @@ Method:
 9. Do not paraphrase, summarize, infer, normalize, or merge disjoint text.
 10. Do not force coverage of every line in the script; omit anything not clearly evidenced.
 11. If evidence is weak or ambiguous, prefer a smaller supported span or omit it rather than guessing.
+12. Breakdown to multiple cue if selectedText contains "->". Avoid using [TAG] in selectedText. 
 
 Priority:
-Precision over completeness.
+Precision over Completeness.
 
 Treat `[CAM]` as a section marker for camera-related text.
 Any text immediately following `[CAM]` should be checked as camera/shot material.
